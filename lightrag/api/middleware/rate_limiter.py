@@ -163,7 +163,7 @@ class RedisRateLimitStore:
             pipe.zcard(key)
 
             # Add current request with a unique member
-            unique_member = f"{current_time_ms}:{hashlib.sha1(str(current_time_ms).encode()).hexdigest()[:8]}"
+            unique_member = f"{current_time_ms}:{hashlib.sha1(str(current_time_ms).encode(), usedforsecurity=False).hexdigest()[:8]}"
             pipe.zadd(key, {unique_member: current_time})
 
             # Set expiration

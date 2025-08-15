@@ -70,7 +70,8 @@ async def _process_with_enhanced_docling(file_path: Path) -> str:
                 "enable_figures": global_args.docling_enable_figures,
             }
             cache_key = hashlib.md5(
-                json.dumps(cache_key_data, sort_keys=True).encode()
+                json.dumps(cache_key_data, sort_keys=True).encode(),
+                usedforsecurity=False
             ).hexdigest()
             cache_file = cache_dir / f"{cache_key}.json"
 
