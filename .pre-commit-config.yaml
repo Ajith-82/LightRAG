@@ -1,28 +1,129 @@
+# Pre-commit hooks configuration for LightRAG
+# See https://pre-commit.com for more information
+
 repos:
+  # Built-in hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v4.5.0
     hooks:
       - id: trailing-whitespace
-        exclude: ^lightrag/api/webui/
+        exclude: '\.md$'
       - id: end-of-file-fixer
-        exclude: ^lightrag/api/webui/
+        exclude: '\.md$'
+      - id: check-yaml
+        args: ['--unsafe']
+        exclude: '^k8s-deploy/.*\.yaml$|^.*\.tpl$|^\.gitlab-ci\.yml$'
+      - id: check-json
+      - id: check-toml
+      - id: check-xml
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-case-conflict
+      - id: check-docstring-first
+      - id: check-executables-have-shebangs
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-vcs-permalinks
+      - id: debug-statements
+      - id: detect-aws-credentials
+        args: ['--allow-missing-credentials']
+      - id: detect-private-key
+      - id: fix-byte-order-marker
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+      - id: name-tests-test
+        args: ['--django']
       - id: requirements-txt-fixer
-        exclude: ^lightrag/api/webui/
 
-
+  # Python code formatting with ruff
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.4
+    rev: v0.12.9
     hooks:
-      - id: ruff-format
-        exclude: ^lightrag/api/webui/
       - id: ruff
-        args: [--fix, --ignore=E402]
-        exclude: ^lightrag/api/webui/
+        args: [--fix, --exit-non-zero-on-fix]
+        types_or: [python, pyi, jupyter]
+      - id: ruff-format
+        types_or: [python, pyi, jupyter]
 
-
-  - repo: https://github.com/mgedmin/check-manifest
-    rev: "0.49"
+  # Import sorting with isort
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
     hooks:
-      - id: check-manifest
-        stages: [manual]
-        exclude: ^lightrag/api/webui/
+      - id: isort
+        args: ["--profile", "black", "--filter-files"]
+
+  # Security checks with bandit
+  - repo: https://github.com/pycqa/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        args: ['-c', 'pyproject.toml']
+        additional_dependencies: ['bandit[toml]']
+        exclude: tests/
+
+  # Type checking with mypy
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [types-requests, types-redis, types-PyYAML]
+        args: [--ignore-missing-imports, --no-strict-optional]
+        exclude: ^(tests/|examples/|docs/)
+
+  # Dockerfile linting
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        args: [--ignore, DL3008, --ignore, DL3009]
+
+  # Shell script linting
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        args: [--severity=warning]
+
+  # YAML formatting
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.1.0
+    hooks:
+      - id: prettier
+        types_or: [yaml, markdown, json]
+        args: [--tab-width=2]
+
+  # Python docstring formatting
+  - repo: https://github.com/pycqa/pydocstyle
+    rev: 6.3.0
+    hooks:
+      - id: pydocstyle
+        args: [--convention=google, --add-ignore=D100,D101,D102,D103,D104,D105,D107]
+        exclude: ^(tests/|examples/|migrations/)
+
+  # Local hooks for project-specific checks
+  - repo: local
+    hooks:
+      # Validate pyproject.toml
+      - id: validate-pyproject
+        name: Validate pyproject.toml
+        entry: python3 -c "import tomllib; tomllib.load(open('pyproject.toml', 'rb'))"
+        language: system
+        files: pyproject\.toml$
+
+# Global configuration
+default_stages: [pre-commit]
+fail_fast: false
+minimum_pre_commit_version: '3.0.0'
+
+# Configuration for specific hooks
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: []
+  submodules: false

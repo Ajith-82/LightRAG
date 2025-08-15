@@ -5,14 +5,15 @@ Tests enhanced password security, rate limiting, security headers,
 and audit logging functionality.
 """
 
-import pytest
-import os
-import tempfile
 import json
-from datetime import datetime, timezone
-from unittest.mock import Mock, AsyncMock, patch
-from pathlib import Path
+import os
 import sys
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -22,22 +23,22 @@ from lightrag.api.auth.password_manager import (
     PasswordPolicy,
     PasswordStrength,
 )
+from lightrag.api.logging.audit_logger import (
+    AuditEvent,
+    AuditEventType,
+    AuditLogConfig,
+    AuditLogger,
+    AuditSeverity,
+)
 from lightrag.api.middleware.rate_limiter import (
     AdvancedRateLimiter,
     RateLimitConfig,
     RateLimitType,
 )
 from lightrag.api.middleware.security_headers import (
-    SecurityHeadersMiddleware,
-    SecurityHeadersConfig,
     SecurityAnalyzer,
-)
-from lightrag.api.logging.audit_logger import (
-    AuditLogger,
-    AuditEvent,
-    AuditEventType,
-    AuditSeverity,
-    AuditLogConfig,
+    SecurityHeadersConfig,
+    SecurityHeadersMiddleware,
 )
 
 # Import auth_handler directly from the auth.py file

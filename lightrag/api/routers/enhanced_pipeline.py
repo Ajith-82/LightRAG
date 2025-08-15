@@ -3,16 +3,18 @@ Enhanced document processing pipeline with Docling service integration.
 """
 
 from pathlib import Path
-from typing import Tuple
+from typing import Optional, Tuple
+
 import aiofiles
 
 from lightrag import LightRAG
 from lightrag.utils import logger
+
 from .document_processing import docling_processor
 
 
 async def enhanced_pipeline_enqueue_file(
-    rag: LightRAG, file_path: Path, track_id: str = None
+    rag: LightRAG, file_path: Path, track_id: Optional[str] = None
 ) -> Tuple[bool, str]:
     """
     Enhanced version of pipeline_enqueue_file with Docling service integration.
@@ -126,7 +128,7 @@ async def enhanced_process_text_file(file_path: Path) -> str:
 
 
 async def enhanced_pipeline_process_any_file(
-    rag: LightRAG, file_path: Path, track_id: str = None
+    rag: LightRAG, file_path: Path, track_id: Optional[str] = None
 ) -> Tuple[bool, str]:
     """
     Process any file type with appropriate handler.

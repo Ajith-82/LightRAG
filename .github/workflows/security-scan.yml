@@ -1,0 +1,412 @@
+name: Security Scanning
+
+on:
+  schedule:
+    # Run security scans daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      scan_type:
+        description: 'Type of security scan'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - dependency
+        - container
+        - code
+        - secrets
+
+env:
+  PYTHON_VERSION: '3.10'
+
+jobs:
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scan_type == 'dependency' || github.event.inputs.scan_type == 'all' || github.event.inputs.scan_type == ''
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install safety pip-audit bandit[toml]
+        pip install -e ".[test,api]"
+
+    - name: Run Safety (PyUp) scan
+      run: |
+        safety check --json --output safety-report.json || true
+        safety check --short-report
+
+    - name: Run pip-audit scan
+      run: |
+        pip-audit --format=json --output=pip-audit-report.json || true
+        pip-audit --desc
+
+    - name: Run Bandit security linter
+      run: |
+        bandit -r lightrag/ lightrag_mcp/ -f json -o bandit-report.json || true
+        bandit -r lightrag/ lightrag_mcp/ -ll
+
+    - name: Upload dependency scan results
+      uses: actions/upload-artifact@v4
+      with:
+        name: dependency-scan-results
+        path: |
+          safety-report.json
+          pip-audit-report.json
+          bandit-report.json
+
+    - name: Process scan results
+      run: |
+        echo "## 🔍 Dependency Vulnerability Scan Results" >> $GITHUB_STEP_SUMMARY
+
+        # Safety results
+        if [ -f safety-report.json ]; then
+          SAFETY_VULNS=$(jq '.vulnerabilities | length' safety-report.json 2>/dev/null || echo "0")
+          echo "- **Safety scan:** $SAFETY_VULNS vulnerabilities found" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        # pip-audit results
+        if [ -f pip-audit-report.json ]; then
+          AUDIT_VULNS=$(jq '.vulnerabilities | length' pip-audit-report.json 2>/dev/null || echo "0")
+          echo "- **pip-audit scan:** $AUDIT_VULNS vulnerabilities found" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        # Bandit results
+        if [ -f bandit-report.json ]; then
+          BANDIT_ISSUES=$(jq '.results | length' bandit-report.json 2>/dev/null || echo "0")
+          echo "- **Bandit scan:** $BANDIT_ISSUES security issues found" >> $GITHUB_STEP_SUMMARY
+        fi
+
+  container-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scan_type == 'container' || github.event.inputs.scan_type == 'all' || github.event.inputs.scan_type == ''
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build test image
+      run: |
+        docker build -t lightrag:security-scan -f Dockerfile.production .
+
+    - name: Run Trivy container scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'lightrag:security-scan'
+        format: 'sarif'
+        output: 'trivy-container-results.sarif'
+
+    - name: Run Trivy filesystem scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-fs-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: |
+          trivy-container-results.sarif
+          trivy-fs-results.sarif
+
+    - name: Run Hadolint Dockerfile linter
+      uses: hadolint/hadolint-action@v3.1.0
+      with:
+        dockerfile: Dockerfile.production
+        format: sarif
+        output-file: hadolint-results.sarif
+
+    - name: Upload Hadolint results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: hadolint-results.sarif
+
+    - name: Generate container scan summary
+      run: |
+        echo "## 🐳 Container Security Scan Results" >> $GITHUB_STEP_SUMMARY
+        echo "- Trivy container scan completed" >> $GITHUB_STEP_SUMMARY
+        echo "- Trivy filesystem scan completed" >> $GITHUB_STEP_SUMMARY
+        echo "- Hadolint Dockerfile analysis completed" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "📊 Detailed results are available in the Security tab." >> $GITHUB_STEP_SUMMARY
+
+  code-scan:
+    name: Static Code Analysis
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scan_type == 'code' || github.event.inputs.scan_type == 'all' || github.event.inputs.scan_type == ''
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      with:
+        languages: python, javascript
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[test,api]"
+
+    - name: Setup Node.js for frontend analysis
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: lightrag_webui/package-lock.json
+
+    - name: Install frontend dependencies
+      working-directory: lightrag_webui
+      run: npm ci
+
+    - name: Build frontend for analysis
+      working-directory: lightrag_webui
+      run: npm run build-no-bun
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+      with:
+        category: "/language:python"
+
+    - name: Run Semgrep static analysis
+      uses: semgrep/semgrep-action@v1
+      with:
+        config: >-
+          p/security-audit
+          p/python
+          p/javascript
+          p/docker
+          p/secrets
+        generateSarif: "1"
+
+    - name: Upload Semgrep results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: semgrep.sarif
+
+    - name: Code scan summary
+      run: |
+        echo "## 🔍 Static Code Analysis Results" >> $GITHUB_STEP_SUMMARY
+        echo "- CodeQL analysis completed" >> $GITHUB_STEP_SUMMARY
+        echo "- Semgrep security rules analysis completed" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "📊 Detailed results are available in the Security tab." >> $GITHUB_STEP_SUMMARY
+
+  secrets-scan:
+    name: Secrets Detection
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scan_type == 'secrets' || github.event.inputs.scan_type == 'all' || github.event.inputs.scan_type == ''
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Run TruffleHog secrets detection
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: main
+        head: HEAD
+        extra_args: --debug --only-verified
+
+    - name: Run GitLeaks secrets detection
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload GitLeaks results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: gitleaks-report
+        path: results.sarif
+
+    - name: Secrets scan summary
+      run: |
+        echo "## 🔐 Secrets Detection Results" >> $GITHUB_STEP_SUMMARY
+        echo "- TruffleHog secrets scan completed" >> $GITHUB_STEP_SUMMARY
+        echo "- GitLeaks secrets detection completed" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "⚠️ If any secrets were found, they must be rotated immediately." >> $GITHUB_STEP_SUMMARY
+
+  security-report:
+    name: Security Report Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, container-scan, code-scan, secrets-scan]
+    if: always()
+
+    steps:
+    - name: Download all scan results
+      uses: actions/download-artifact@v4
+
+    - name: Generate security report
+      run: |
+        echo "# 🛡️ Security Scan Report" > security-report.md
+        echo "" >> security-report.md
+        echo "**Scan Date:** $(date -u)" >> security-report.md
+        echo "**Repository:** ${{ github.repository }}" >> security-report.md
+        echo "**Commit:** ${{ github.sha }}" >> security-report.md
+        echo "" >> security-report.md
+
+        echo "## Scan Results" >> security-report.md
+        echo "" >> security-report.md
+
+        # Process dependency scan results
+        if [ -d "dependency-scan-results" ]; then
+          echo "### 📦 Dependency Vulnerabilities" >> security-report.md
+
+          if [ -f "dependency-scan-results/safety-report.json" ]; then
+            SAFETY_VULNS=$(jq '.vulnerabilities | length' dependency-scan-results/safety-report.json 2>/dev/null || echo "0")
+            echo "- **Safety (PyUp):** $SAFETY_VULNS vulnerabilities" >> security-report.md
+          fi
+
+          if [ -f "dependency-scan-results/pip-audit-report.json" ]; then
+            AUDIT_VULNS=$(jq '.vulnerabilities | length' dependency-scan-results/pip-audit-report.json 2>/dev/null || echo "0")
+            echo "- **pip-audit:** $AUDIT_VULNS vulnerabilities" >> security-report.md
+          fi
+
+          if [ -f "dependency-scan-results/bandit-report.json" ]; then
+            BANDIT_ISSUES=$(jq '.results | length' dependency-scan-results/bandit-report.json 2>/dev/null || echo "0")
+            echo "- **Bandit:** $BANDIT_ISSUES security issues" >> security-report.md
+          fi
+          echo "" >> security-report.md
+        fi
+
+        echo "### 🐳 Container Security" >> security-report.md
+        echo "- Trivy container scan: ${{ needs.container-scan.result }}" >> security-report.md
+        echo "- Hadolint Dockerfile analysis: ${{ needs.container-scan.result }}" >> security-report.md
+        echo "" >> security-report.md
+
+        echo "### 🔍 Static Code Analysis" >> security-report.md
+        echo "- CodeQL analysis: ${{ needs.code-scan.result }}" >> security-report.md
+        echo "- Semgrep security rules: ${{ needs.code-scan.result }}" >> security-report.md
+        echo "" >> security-report.md
+
+        echo "### 🔐 Secrets Detection" >> security-report.md
+        echo "- TruffleHog scan: ${{ needs.secrets-scan.result }}" >> security-report.md
+        echo "- GitLeaks detection: ${{ needs.secrets-scan.result }}" >> security-report.md
+        echo "" >> security-report.md
+
+        echo "## Recommendations" >> security-report.md
+        echo "" >> security-report.md
+        echo "1. Review all findings in the GitHub Security tab" >> security-report.md
+        echo "2. Address high and critical severity vulnerabilities immediately" >> security-report.md
+        echo "3. Update dependencies with known vulnerabilities" >> security-report.md
+        echo "4. Rotate any exposed secrets" >> security-report.md
+        echo "5. Review and fix code quality issues" >> security-report.md
+
+    - name: Upload security report
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-report
+        path: security-report.md
+
+    - name: Check for critical issues
+      run: |
+        # Set exit code based on scan results
+        CRITICAL_FOUND=false
+
+        # Check dependency scans
+        if [ -f "dependency-scan-results/safety-report.json" ]; then
+          CRITICAL_VULNS=$(jq '[.vulnerabilities[] | select(.severity == "Critical" or .severity == "High")] | length' dependency-scan-results/safety-report.json 2>/dev/null || echo "0")
+          if [ "$CRITICAL_VULNS" -gt "0" ]; then
+            echo "❌ Found $CRITICAL_VULNS critical/high severity vulnerabilities"
+            CRITICAL_FOUND=true
+          fi
+        fi
+
+        # Exit with error if critical issues found (only for scheduled runs)
+        if [ "$CRITICAL_FOUND" = true ] && [ "${{ github.event_name }}" = "schedule" ]; then
+          echo "🚨 Critical security issues found! Please address immediately."
+          exit 1
+        fi
+
+        echo "✅ Security scan completed"
+
+    - name: Create security issue (if scheduled and critical issues found)
+      if: failure() && github.event_name == 'schedule'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          await github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: '🚨 Critical Security Vulnerabilities Detected',
+            body: `## Security Alert
+
+            Our automated security scan has detected critical vulnerabilities in the repository.
+
+            **Scan Date:** ${new Date().toISOString()}
+            **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            ## Action Required
+
+            1. Review the security scan results in the Actions tab
+            2. Address all critical and high severity issues
+            3. Update vulnerable dependencies
+            4. Close this issue once all issues are resolved
+
+            ## Scan Results
+
+            Please check the Security tab and the workflow artifacts for detailed findings.
+
+            ⚠️ **This is an automated issue created by the security scanning workflow.**`,
+            labels: ['security', 'critical', 'automated']
+          });
+
+  notify-security-team:
+    name: Notify Security Team
+    runs-on: ubuntu-latest
+    needs: security-report
+    if: failure() && github.event_name == 'schedule'
+
+    steps:
+    - name: Send notification
+      run: |
+        echo "🚨 Security scan failed - critical issues detected"
+        echo "Repository: ${{ github.repository }}"
+        echo "Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+        # Here you could add integration with:
+        # - Slack webhook
+        # - Microsoft Teams
+        # - Email notification
+        # - PagerDuty
+        # Example:
+        # curl -X POST -H 'Content-type: application/json' \
+        #   --data '{"text":"🚨 Critical security issues detected in ${{ github.repository }}"}' \
+        #   ${{ secrets.SLACK_WEBHOOK_URL }}

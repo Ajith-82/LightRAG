@@ -8,15 +8,16 @@ capabilities for authentication and system operations.
 import asyncio
 import json
 import logging
+import os
+import tempfile
+import threading
 import uuid
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, Optional, List
-from dataclasses import dataclass, asdict
+from collections import defaultdict, deque
+from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
-import os
-import threading
-from collections import defaultdict, deque
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("lightrag.audit")
 
@@ -132,7 +133,7 @@ class AuditEvent:
 
     # Event details
     message: str = ""
-    details: Dict[str, Any] = None
+    details: Optional[Dict[str, Any]] = None
     success: bool = True
     error_message: Optional[str] = None
 
@@ -143,8 +144,8 @@ class AuditEvent:
 
     # Metadata
     correlation_id: Optional[str] = None
-    tags: List[str] = None
-    metadata: Dict[str, Any] = None
+    tags: Optional[List[str]] = None
+    metadata: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         """Post-initialization processing."""
@@ -187,9 +188,6 @@ class AuditLogFormatter(logging.Formatter):
         else:
             # Standard log message
             return super().format(record)
-
-
-import tempfile
 
 
 @dataclass
@@ -388,11 +386,11 @@ class AuditLogger:
     async def log_auth_event(
         self,
         event_type: AuditEventType,
-        user_id: str = None,
+        user_id: Optional[str] = None,
         success: bool = True,
-        details: Dict[str, Any] = None,
-        ip_address: str = None,
-        user_agent: str = None,
+        details: Optional[Dict[str, Any]] = None,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
         **kwargs,
     ):
         """Log authentication event."""
@@ -421,9 +419,9 @@ class AuditLogger:
         endpoint: str,
         method: str,
         status_code: int,
-        user_id: str = None,
-        ip_address: str = None,
-        response_time: float = None,
+        user_id: Optional[str] = None,
+        ip_address: Optional[str] = None,
+        response_time: Optional[float] = None,
         **kwargs,
     ):
         """Log API access event."""
@@ -459,7 +457,7 @@ class AuditLogger:
         event_type: AuditEventType,
         severity: AuditSeverity = AuditSeverity.MEDIUM,
         message: str = "",
-        details: Dict[str, Any] = None,
+        details: Optional[Dict[str, Any]] = None,
         **kwargs,
     ):
         """Log security event."""

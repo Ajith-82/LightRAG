@@ -83,6 +83,36 @@ test = [
     "pytest-asyncio",
     "pytest-cov",
     "pytest-mock",
+    "scikit-learn",
+    "scipy",
+    "faiss-cpu",
+    "networkx",
+    # Document processing dependencies
+    "pypdf2",
+    "python-docx",
+    # Core LightRAG dependencies
+    "tenacity",
+    "pipmaster",
+    "pyuca",
+    "nano-vectordb",
+    "python-dotenv",
+    # API testing dependencies
+    "pyjwt",
+    "uvicorn",
+    "aiofiles",
+    # Phase 3 production testing dependencies
+    "docker",
+    "kubernetes",
+    "prometheus-client",
+    "requests",
+    "aiohttp",
+    "pyyaml",
+    "numpy",
+    "locust",
+    "psutil",
+    "cryptography",
+    "bcrypt",
+    "passlib"
 ]
 
 [project.scripts]
@@ -109,3 +139,99 @@ lightrag = ["api/webui/**/*"]
 
 [tool.ruff]
 target-version = "py310"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--cov=lightrag",
+    "--cov=lightrag_mcp",
+    "--cov-report=term-missing",
+    "--cov-report=html:htmlcov",
+    "--cov-report=xml:coverage.xml",
+    "--cov-fail-under=70",
+    "--tb=short",
+]
+testpaths = [
+    "tests",
+]
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "security: marks tests as security tests",
+    "unit: marks tests as unit tests",
+    "api: marks tests as API tests",
+    "storage: marks tests as storage tests",
+    "core: marks tests as core functionality tests",
+    "llm: marks tests as LLM provider tests",
+    "document: marks tests as document processing tests",
+    "graph: marks tests as knowledge graph tests",
+    "vector: marks tests as vector operations tests",
+    "rag: marks tests as RAG query tests",
+    "mcp: marks tests as MCP server tests",
+    "phase1: marks tests as Phase 1 infrastructure tests",
+    "phase2: marks tests as Phase 2 core functionality tests",
+    "phase3: marks tests as Phase 3 production hardening tests",
+    "production: marks tests as production environment tests",
+    "deployment: marks tests as deployment and infrastructure tests",
+    "performance: marks tests as performance and load tests",
+    "monitoring: marks tests as monitoring and observability tests",
+    "disaster_recovery: marks tests as backup and disaster recovery tests",
+    "containers: marks tests as container and orchestration tests",
+    "security_hardening: marks tests as security hardening tests",
+]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["lightrag", "lightrag_mcp"]
+branch = true
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+    "*/.*",
+    "*/venv/*",
+    "*/.venv/*",
+    "*/build/*",
+    "*/dist/*",
+    "*/examples/*",
+    "*/docs/*",
+    "setup.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+    "except ImportError:",
+    "except ModuleNotFoundError:",
+]
+show_missing = true
+skip_covered = false
+precision = 2
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
+[tool.bandit]
+exclude_dirs = ["tests", "examples", "docs", "build", "dist"]
+skips = ["B101", "B601"]

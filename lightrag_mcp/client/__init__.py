@@ -6,6 +6,6 @@ supporting both REST API and direct library access modes.
 """
 
 from .api_client import LightRAGAPIClient
-from .direct_client import LightRAGDirectClient, DirectClientError
+from .direct_client import DirectClientError, LightRAGDirectClient
 
 __all__ = ["LightRAGAPIClient", "LightRAGDirectClient", "DirectClientError"]

@@ -6,8 +6,8 @@ import pytest
 
 from lightrag.api.utils_api import (
     check_env_file,
-    get_combined_auth_dependency,
     display_splash_screen,
+    get_combined_auth_dependency,
 )
 
 

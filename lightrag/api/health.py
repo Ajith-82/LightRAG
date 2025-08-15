@@ -2,19 +2,19 @@
 Health Check Module for LightRAG Production Deployment
 """
 
-import time
-import psutil
 import logging
-from typing import Dict, Any, Optional
+import os
+import time
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
-from dataclasses import dataclass, asdict
+from typing import Any, Dict, Optional
 
-import redis
+import psutil
 import psycopg2
+import redis
 from psycopg2 import OperationalError as PgOperationalError
 
 from lightrag.api.config import global_args
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class HealthStatus:
     version: str = "1.0.0"
     environment: str = "production"
     uptime_seconds: float = 0.0
-    checks: Dict[str, Any] = None
+    checks: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         if self.checks is None:

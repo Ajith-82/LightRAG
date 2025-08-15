@@ -8,17 +8,17 @@ and comprehensive monitoring capabilities.
 import asyncio
 import hashlib
 import json
-import time
-from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass
-from enum import Enum
 import logging
+import time
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
 from slowapi.util import get_remote_address
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 
 try:
     import redis.asyncio as redis
@@ -163,7 +163,7 @@ class RedisRateLimitStore:
             pipe.zcard(key)
 
             # Add current request with a unique member
-            unique_member = f"{current_time_ms}:{hashlib.sha1(str(current_time_ms).encode()).hexdigest()[:8]}"
+            unique_member = f"{current_time_ms}:{hashlib.sha1(str(current_time_ms).encode(), usedforsecurity=False).hexdigest()[:8]}"
             pipe.zadd(key, {unique_member: current_time})
 
             # Set expiration

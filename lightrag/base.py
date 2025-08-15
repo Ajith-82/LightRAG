@@ -1,29 +1,32 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from enum import Enum
 import os
-from dotenv import load_dotenv
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import (
     Any,
+    Callable,
     Literal,
+    Optional,
     TypedDict,
     TypeVar,
-    Callable,
 )
-from .utils import EmbeddingFunc
-from .types import KnowledgeGraph
+
+from dotenv import load_dotenv
+
 from .constants import (
-    GRAPH_FIELD_SEP,
-    DEFAULT_TOP_K,
     DEFAULT_CHUNK_TOP_K,
+    DEFAULT_ENABLE_RERANK,
+    DEFAULT_HISTORY_TURNS,
     DEFAULT_MAX_ENTITY_TOKENS,
     DEFAULT_MAX_RELATION_TOKENS,
     DEFAULT_MAX_TOTAL_TOKENS,
-    DEFAULT_HISTORY_TURNS,
-    DEFAULT_ENABLE_RERANK,
+    DEFAULT_TOP_K,
+    GRAPH_FIELD_SEP,
 )
+from .types import KnowledgeGraph
+from .utils import EmbeddingFunc
 
 # use the .env that is inside the current folder
 # allows to use different .env file for each lightrag instance
@@ -103,16 +106,16 @@ class QueryParam:
     history_turns: int = int(os.getenv("HISTORY_TURNS", str(DEFAULT_HISTORY_TURNS)))
     """Number of complete conversation turns (user-assistant pairs) to consider in the response context."""
 
-    ids: list[str] | None = None
+    ids: Optional[list[str]] = None
     """List of ids to filter the results."""
 
-    model_func: Callable[..., object] | None = None
+    model_func: Optional[Callable[..., object]] = None
     """Optional override for the LLM model function to use for this specific query.
     If provided, this will be used instead of the global model function.
     This allows using different models for different query modes.
     """
 
-    user_prompt: str | None = None
+    user_prompt: Optional[str] = None
     """User-provided prompt for the query.
     If proivded, this will be use instead of the default vaulue from prompt template.
     """
@@ -129,7 +132,7 @@ class QueryParam:
 class StorageNameSpace(ABC):
     namespace: str
     workspace: str
-    global_config: dict[str, Any]
+    global_config: dict
 
     async def initialize(self):
         """Initialize the storage"""
@@ -178,7 +181,7 @@ class BaseVectorStorage(StorageNameSpace, ABC):
 
     @abstractmethod
     async def query(
-        self, query: str, top_k: int, ids: list[str] | None = None
+        self, query: str, top_k: int, ids: Optional[list[str]] = None
     ) -> list[dict[str, Any]]:
         """Query the vector storage and retrieve top_k results."""
 
@@ -213,7 +216,7 @@ class BaseVectorStorage(StorageNameSpace, ABC):
         """
 
     @abstractmethod
-    async def get_by_id(self, id: str) -> dict[str, Any] | None:
+    async def get_by_id(self, id: str) -> Optional[dict[str, Any]]:
         """Get vector data by its ID
 
         Args:
@@ -255,7 +258,7 @@ class BaseKVStorage(StorageNameSpace, ABC):
     embedding_func: EmbeddingFunc
 
     @abstractmethod
-    async def get_by_id(self, id: str) -> dict[str, Any] | None:
+    async def get_by_id(self, id: str) -> Optional[dict[str, Any]]:
         """Get value by id"""
 
     @abstractmethod
@@ -290,7 +293,7 @@ class BaseKVStorage(StorageNameSpace, ABC):
             None
         """
 
-    async def drop_cache_by_modes(self, modes: list[str] | None = None) -> bool:
+    async def drop_cache_by_modes(self, modes: Optional[list[str]] = None) -> bool:
         """Delete specific records from storage by cache mode
 
         Importance notes for in-memory storage:
@@ -359,7 +362,7 @@ class BaseGraphStorage(StorageNameSpace, ABC):
         """
 
     @abstractmethod
-    async def get_node(self, node_id: str) -> dict[str, str] | None:
+    async def get_node(self, node_id: str) -> Optional[dict[str, str]]:
         """Get node by its ID, returning only node properties.
 
         Args:
@@ -384,7 +387,9 @@ class BaseGraphStorage(StorageNameSpace, ABC):
         """
 
     @abstractmethod
-    async def get_node_edges(self, source_node_id: str) -> list[tuple[str, str]] | None:
+    async def get_node_edges(
+        self, source_node_id: str
+    ) -> Optional[list[tuple[str, str]]]:
         """Get all edges connected to a node.
 
         Args:
@@ -641,13 +646,13 @@ class DocProcessingStatus:
     """ISO format timestamp when document was created"""
     updated_at: str
     """ISO format timestamp when document was last updated"""
-    track_id: str | None = None
+    track_id: Optional[str] = None
     """Tracking ID for monitoring progress"""
-    chunks_count: int | None = None
+    chunks_count: Optional[int] = None
     """Number of chunks after splitting, used for processing"""
-    chunks_list: list[str] | None = field(default_factory=list)
+    chunks_list: Optional[list[str]] = field(default_factory=list)
     """List of chunk IDs associated with this document, used for deletion"""
-    error_msg: str | None = None
+    error_msg: Optional[str] = None
     """Error message if failed"""
     metadata: dict[str, Any] = field(default_factory=dict)
     """Additional metadata"""
@@ -673,7 +678,7 @@ class DocStatusStorage(BaseKVStorage, ABC):
     ) -> dict[str, DocProcessingStatus]:
         """Get all documents with a specific track_id"""
 
-    async def drop_cache_by_modes(self, modes: list[str] | None = None) -> bool:
+    async def drop_cache_by_modes(self, modes: Optional[list[str]] = None) -> bool:
         """Drop cache is not supported for Doc Status storage"""
         return False
 
@@ -695,4 +700,4 @@ class DeletionResult:
     doc_id: str
     message: str
     status_code: int = 200
-    file_path: str | None = None
+    file_path: Optional[str] = None

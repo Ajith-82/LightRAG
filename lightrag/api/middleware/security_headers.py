@@ -5,13 +5,14 @@ Provides comprehensive security headers to protect against common
 web vulnerabilities and attacks.
 """
 
+import logging
 import os
-from typing import Dict, Optional, List
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
-import logging
 
 logger = logging.getLogger("lightrag.auth.security_headers")
 
@@ -53,7 +54,7 @@ class SecurityHeadersConfig:
     enable_permissions_policy: bool = True
 
     # Custom headers
-    custom_headers: Dict[str, str] = None
+    custom_headers: Optional[Dict[str, str]] = None
 
     # Server header
     hide_server_header: bool = True
@@ -273,7 +274,7 @@ class CSPViolationReporter:
 
     def __init__(self, report_endpoint: str = "/security/csp-report"):
         self.report_endpoint = report_endpoint
-        self.violations = []
+        self.violations: list[dict] = []
 
     async def handle_csp_report(self, request: Request) -> Response:
         """Handle CSP violation reports."""
@@ -315,7 +316,7 @@ class SecurityAnalyzer:
     def __init__(self, config: SecurityHeadersConfig):
         self.config = config
 
-    def analyze_security_posture(self) -> Dict[str, any]:
+    def analyze_security_posture(self) -> Dict[str, Any]:
         """Analyze current security configuration."""
         analysis = {
             "score": 0,

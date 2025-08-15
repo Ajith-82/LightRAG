@@ -1,98 +1,100 @@
 from __future__ import annotations
 
-import traceback
 import asyncio
 import configparser
 import os
 import time
+import traceback
 import warnings
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from functools import partial
+
+# Import for type annotation
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncIterator,
     Callable,
+    Dict,
     Iterator,
-    cast,
-    final,
+    List,
     Literal,
     Optional,
-    List,
-    Dict,
+    Union,
+    cast,
+    final,
 )
+
 from lightrag.constants import (
-    DEFAULT_MAX_GLEANING,
-    DEFAULT_FORCE_LLM_SUMMARY_ON_MERGE,
-    DEFAULT_TOP_K,
     DEFAULT_CHUNK_TOP_K,
+    DEFAULT_COSINE_THRESHOLD,
+    DEFAULT_FORCE_LLM_SUMMARY_ON_MERGE,
     DEFAULT_MAX_ENTITY_TOKENS,
+    DEFAULT_MAX_GLEANING,
     DEFAULT_MAX_RELATION_TOKENS,
     DEFAULT_MAX_TOTAL_TOKENS,
-    DEFAULT_COSINE_THRESHOLD,
-    DEFAULT_RELATED_CHUNK_NUMBER,
     DEFAULT_MIN_RERANK_SCORE,
+    DEFAULT_RELATED_CHUNK_NUMBER,
     DEFAULT_SUMMARY_MAX_TOKENS,
+    DEFAULT_TOP_K,
 )
-from lightrag.utils import get_env_value
-
 from lightrag.kg import (
     STORAGES,
     verify_storage_implementation,
 )
-
-# Import for type annotation
-from typing import TYPE_CHECKING
+from lightrag.utils import get_env_value
 
 if TYPE_CHECKING:
     from lightrag.api.config import OllamaServerInfos
 
+from dotenv import load_dotenv
+
 from lightrag.kg.shared_storage import (
+    get_graph_db_lock,
     get_namespace_data,
     get_pipeline_status_lock,
-    get_graph_db_lock,
 )
 
 from .base import (
     BaseGraphStorage,
     BaseKVStorage,
     BaseVectorStorage,
+    DeletionResult,
     DocProcessingStatus,
     DocStatus,
     DocStatusStorage,
     QueryParam,
     StorageNameSpace,
     StoragesStatus,
-    DeletionResult,
-)
-from .namespace import NameSpace
-from .operate import (
-    chunking_by_token_size,
-    extract_entities,
-    merge_nodes_and_edges,
-    kg_query,
-    naive_query,
-    query_with_keywords,
-    _rebuild_knowledge_from_chunks,
 )
 from .constants import GRAPH_FIELD_SEP
-from .utils import (
-    Tokenizer,
-    TiktokenTokenizer,
-    EmbeddingFunc,
-    always_get_an_event_loop,
-    compute_mdhash_id,
-    convert_response_to_json,
-    lazy_external_import,
-    priority_limit_async_func_call,
-    get_content_summary,
-    clean_text,
-    check_storage_env_vars,
-    generate_track_id,
-    logger,
+from .namespace import NameSpace
+from .operate import (
+    _rebuild_knowledge_from_chunks,
+    chunking_by_token_size,
+    extract_entities,
+    kg_query,
+    merge_nodes_and_edges,
+    naive_query,
+    query_with_keywords,
 )
 from .types import KnowledgeGraph
-from dotenv import load_dotenv
+from .utils import (
+    EmbeddingFunc,
+    TiktokenTokenizer,
+    Tokenizer,
+    always_get_an_event_loop,
+    check_storage_env_vars,
+    clean_text,
+    compute_mdhash_id,
+    convert_response_to_json,
+    generate_track_id,
+    get_content_summary,
+    lazy_external_import,
+    logger,
+    priority_limit_async_func_call,
+)
 
 # use the .env that is inside the current folder
 # allows to use different .env file for each lightrag instance
@@ -138,8 +140,8 @@ class LightRAG:
 
     # Logging (Deprecated, use setup_logger in utils.py instead)
     # ---
-    log_level: int | None = field(default=None)
-    log_file_path: str | None = field(default=None)
+    log_level: Optional[int] = field(default=None)
+    log_file_path: Optional[str] = field(default=None)
 
     # Query parameters
     # ---
@@ -245,7 +247,7 @@ class LightRAG:
     # Embedding
     # ---
 
-    embedding_func: EmbeddingFunc | None = field(default=None)
+    embedding_func: Optional[EmbeddingFunc] = field(default=None)
     """Function for computing text embeddings. Must be set before use."""
 
     embedding_batch_num: int = field(default=int(os.getenv("EMBEDDING_BATCH_NUM", 10)))
@@ -272,7 +274,7 @@ class LightRAG:
     # LLM Configuration
     # ---
 
-    llm_model_func: Callable[..., object] | None = field(default=None)
+    llm_model_func: Optional[Callable[..., object]] = field(default=None)
     """Function for interacting with the large language model (LLM). Must be set before use."""
 
     llm_model_name: str = field(default="gpt-4o-mini")
@@ -292,7 +294,7 @@ class LightRAG:
     # Rerank Configuration
     # ---
 
-    rerank_model_func: Callable[..., object] | None = field(default=None)
+    rerank_model_func: Optional[Callable[..., object]] = field(default=None)
     """Function for reranking retrieved documents. All rerank configurations (model name, API keys, top_k, etc.) should be included in this function. Optional."""
 
     min_rerank_score: float = field(
@@ -655,7 +657,7 @@ class LightRAG:
 
     def insert(
         self,
-        input: str | list[str],
+        input: Union[str, list[str]],
         split_by_character: str | None = None,
         split_by_character_only: bool = False,
         ids: str | list[str] | None = None,
@@ -691,7 +693,7 @@ class LightRAG:
 
     async def ainsert(
         self,
-        input: str | list[str],
+        input: Union[str, list[str]],
         split_by_character: str | None = None,
         split_by_character_only: bool = False,
         ids: str | list[str] | None = None,

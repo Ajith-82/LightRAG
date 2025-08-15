@@ -1,25 +1,25 @@
-import os
 import asyncio
+import configparser
+import os
 import random
 from dataclasses import dataclass
-from typing import final
-import configparser
+from typing import Optional, final
 
-from ..utils import logger
-from ..base import BaseGraphStorage
-from ..types import KnowledgeGraph, KnowledgeGraphNode, KnowledgeGraphEdge
-from ..constants import GRAPH_FIELD_SEP
 import pipmaster as pm
+
+from ..base import BaseGraphStorage
+from ..constants import GRAPH_FIELD_SEP
+from ..types import KnowledgeGraph, KnowledgeGraphEdge, KnowledgeGraphNode
+from ..utils import logger
 
 if not pm.is_installed("neo4j"):
     pm.install("neo4j")
+from dotenv import load_dotenv
 from neo4j import (
     AsyncGraphDatabase,
     AsyncManagedTransaction,
 )
-from neo4j.exceptions import TransientError, ResultFailedError
-
-from dotenv import load_dotenv
+from neo4j.exceptions import ResultFailedError, TransientError
 
 # use the .env that is inside the current folder
 load_dotenv(dotenv_path=".env", override=False)
@@ -182,7 +182,7 @@ class MemgraphStorage(BaseGraphStorage):
                 await result.consume()  # Ensure the result is consumed even on error
                 raise
 
-    async def get_node(self, node_id: str) -> dict[str, str] | None:
+    async def get_node(self, node_id: str) -> Optional[dict[str, str]]:
         """Get node by its label identifier, return only node properties
 
         Args:
@@ -314,7 +314,9 @@ class MemgraphStorage(BaseGraphStorage):
                 await result.consume()  # Ensure the result is consumed even on error
                 raise
 
-    async def get_node_edges(self, source_node_id: str) -> list[tuple[str, str]] | None:
+    async def get_node_edges(
+        self, source_node_id: str
+    ) -> Optional[list[tuple[str, str]]]:
         """Retrieves all edges (relationships) for a particular node identified by its label.
 
         Args:

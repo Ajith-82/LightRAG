@@ -1,35 +1,33 @@
+import configparser
+import logging
 import os
 import re
 from dataclasses import dataclass
-from typing import final
-import configparser
+from typing import Optional, final
 
-
+import pipmaster as pm
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
 )
 
-import logging
-from ..utils import logger
 from ..base import BaseGraphStorage
-from ..types import KnowledgeGraph, KnowledgeGraphNode, KnowledgeGraphEdge
 from ..constants import GRAPH_FIELD_SEP
-import pipmaster as pm
+from ..types import KnowledgeGraph, KnowledgeGraphEdge, KnowledgeGraphNode
+from ..utils import logger
 
 if not pm.is_installed("neo4j"):
     pm.install("neo4j")
 
-from neo4j import (  # type: ignore
-    AsyncGraphDatabase,
-    exceptions as neo4jExceptions,
+from dotenv import load_dotenv
+from neo4j import (
     AsyncDriver,
+    AsyncGraphDatabase,
     AsyncManagedTransaction,
 )
-
-from dotenv import load_dotenv
+from neo4j import exceptions as neo4jExceptions  # type: ignore
 
 # use the .env that is inside the current folder
 # allows to use different .env file for each lightrag instance
@@ -279,7 +277,7 @@ class Neo4JStorage(BaseGraphStorage):
                 await result.consume()  # Ensure results are consumed even on error
                 raise
 
-    async def get_node(self, node_id: str) -> dict[str, str] | None:
+    async def get_node(self, node_id: str) -> Optional[dict[str, str]]:
         """Get node by its label identifier, return only node properties
 
         Args:
@@ -629,7 +627,9 @@ class Neo4JStorage(BaseGraphStorage):
             await result.consume()
             return edges_dict
 
-    async def get_node_edges(self, source_node_id: str) -> list[tuple[str, str]] | None:
+    async def get_node_edges(
+        self, source_node_id: str
+    ) -> Optional[list[tuple[str, str]]]:
         """Retrieves all edges (relationships) for a particular node identified by its label.
 
         Args:

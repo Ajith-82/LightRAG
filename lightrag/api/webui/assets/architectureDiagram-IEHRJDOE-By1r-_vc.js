@@ -16,10 +16,10 @@ import{_ as at,g as qe,s as Je,a as Qe,b as Ke,t as je,q as _e,K as tr,a2 as er,
     stroke-dasharray: 8;
   }
   .node-icon-text {
-    display: flex; 
+    display: flex;
     align-items: center;
   }
-  
+
   .node-icon-text > div {
     color: #fff;
     margin: 1px;

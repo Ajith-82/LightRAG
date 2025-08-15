@@ -3,15 +3,16 @@ This module contains all document-related routes for the LightRAG API.
 """
 
 import asyncio
-from pyuca import Collator
-from lightrag.utils import logger
-import aiofiles
+import hashlib
+import json
 import shutil
 import traceback
-import pipmaster as pm
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Literal
+from typing import Any, Dict, List, Literal, Optional
+
+import aiofiles
+import pipmaster as pm
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -21,13 +22,13 @@ from fastapi import (
     UploadFile,
 )
 from pydantic import BaseModel, Field, field_validator
-import hashlib
-import json
+from pyuca import Collator
 
 from lightrag import LightRAG
-from lightrag.base import DeletionResult, DocProcessingStatus, DocStatus
-from lightrag.utils import generate_track_id
 from lightrag.api.utils_api import get_combined_auth_dependency
+from lightrag.base import DeletionResult, DocProcessingStatus, DocStatus
+from lightrag.utils import generate_track_id, logger
+
 from ..config import global_args
 
 
@@ -46,9 +47,9 @@ async def _process_with_enhanced_docling(file_path: Path) -> str:
         pm.install("docling")
 
     try:
-        from docling.document_converter import DocumentConverter  # type: ignore
         from docling.datamodel.base_models import ConversionStatus  # type: ignore
         from docling.datamodel.document import ConversionResult  # type: ignore
+        from docling.document_converter import DocumentConverter  # type: ignore
 
         # Check cache if enabled
         cache_dir = None
@@ -69,7 +70,8 @@ async def _process_with_enhanced_docling(file_path: Path) -> str:
                 "enable_figures": global_args.docling_enable_figures,
             }
             cache_key = hashlib.md5(
-                json.dumps(cache_key_data, sort_keys=True).encode()
+                json.dumps(cache_key_data, sort_keys=True).encode(),
+                usedforsecurity=False,
             ).hexdigest()
             cache_file = cache_dir / f"{cache_key}.json"
 
@@ -498,20 +500,19 @@ class ClearCacheResponse(BaseModel):
         }
 
 
-"""Response model for document status
-
-Attributes:
-    id: Document identifier
-    content_summary: Summary of document content
-    content_length: Length of document content
-    status: Current processing status
-    created_at: Creation timestamp (ISO format string)
-    updated_at: Last update timestamp (ISO format string)
-    chunks_count: Number of chunks (optional)
-    error: Error message if any (optional)
-    metadata: Additional metadata (optional)
-    file_path: Path to the document file
-"""
+# Response model for document status
+#
+# Attributes:
+#     id: Document identifier
+#     content_summary: Summary of document content
+#     content_length: Length of document content
+#     status: Current processing status
+#     created_at: Creation timestamp (ISO format string)
+#     updated_at: Last update timestamp (ISO format string)
+#     chunks_count: Number of chunks (optional)
+#     error: Error message if any (optional)
+#     metadata: Additional metadata (optional)
+#     file_path: Path to the document file
 
 
 class DeleteDocRequest(BaseModel):
@@ -815,7 +816,7 @@ class DocumentManager:
 
 
 async def pipeline_enqueue_file(
-    rag: LightRAG, file_path: Path, track_id: str = None
+    rag: LightRAG, file_path: Path, track_id: Optional[str] = None
 ) -> tuple[bool, str]:
     """Add a file to the queue for processing
 
@@ -836,135 +837,135 @@ async def pipeline_enqueue_file(
             file = await f.read()
 
         # Process based on file type
-        match ext:
-            case (
-                ".txt"
-                | ".md"
-                | ".html"
-                | ".htm"
-                | ".tex"
-                | ".json"
-                | ".xml"
-                | ".yaml"
-                | ".yml"
-                | ".rtf"
-                | ".odt"
-                | ".epub"
-                | ".csv"
-                | ".log"
-                | ".conf"
-                | ".ini"
-                | ".properties"
-                | ".sql"
-                | ".bat"
-                | ".sh"
-                | ".c"
-                | ".cpp"
-                | ".py"
-                | ".java"
-                | ".js"
-                | ".ts"
-                | ".swift"
-                | ".go"
-                | ".rb"
-                | ".php"
-                | ".css"
-                | ".scss"
-                | ".less"
-            ):
-                try:
-                    # Try to decode as UTF-8
-                    content = file.decode("utf-8")
+        text_extensions = {
+            ".txt",
+            ".md",
+            ".html",
+            ".htm",
+            ".tex",
+            ".json",
+            ".xml",
+            ".yaml",
+            ".yml",
+            ".rtf",
+            ".odt",
+            ".epub",
+            ".csv",
+            ".log",
+            ".conf",
+            ".ini",
+            ".properties",
+            ".sql",
+            ".bat",
+            ".sh",
+            ".c",
+            ".cpp",
+            ".py",
+            ".java",
+            ".js",
+            ".ts",
+            ".swift",
+            ".go",
+            ".rb",
+            ".php",
+            ".css",
+            ".scss",
+            ".less",
+        }
 
-                    # Validate content
-                    if not content or len(content.strip()) == 0:
-                        logger.error(f"Empty content in file: {file_path.name}")
-                        return False
+        if ext in text_extensions:
+            try:
+                # Try to decode as UTF-8
+                content = file.decode("utf-8")
 
-                    # Check if content looks like binary data string representation
-                    if content.startswith("b'") or content.startswith('b"'):
-                        logger.error(
-                            f"File {file_path.name} appears to contain binary data representation instead of text"
-                        )
-                        return False
+                # Validate content
+                if not content or len(content.strip()) == 0:
+                    logger.error(f"Empty content in file: {file_path.name}")
+                    return False
 
-                except UnicodeDecodeError:
+                # Check if content looks like binary data string representation
+                if content.startswith("b'") or content.startswith('b"'):
                     logger.error(
-                        f"File {file_path.name} is not valid UTF-8 encoded text. Please convert it to UTF-8 before processing."
+                        f"File {file_path.name} appears to contain binary data representation instead of text"
                     )
                     return False
-            case ".pdf":
-                if global_args.document_loading_engine == "DOCLING":
-                    content = await _process_with_enhanced_docling(file_path)
-                else:
-                    if not pm.is_installed("pypdf2"):  # type: ignore
-                        pm.install("pypdf2")
-                    from PyPDF2 import PdfReader  # type: ignore
-                    from io import BytesIO
 
-                    pdf_file = BytesIO(file)
-                    reader = PdfReader(pdf_file)
-                    for page in reader.pages:
-                        content += page.extract_text() + "\n"
-            case ".docx":
-                if global_args.document_loading_engine == "DOCLING":
-                    content = await _process_with_enhanced_docling(file_path)
-                else:
-                    if not pm.is_installed("python-docx"):  # type: ignore
-                        try:
-                            pm.install("python-docx")
-                        except Exception:
-                            pm.install("docx")
-                    from docx import Document  # type: ignore
-                    from io import BytesIO
-
-                    docx_file = BytesIO(file)
-                    doc = Document(docx_file)
-                    content = "\n".join(
-                        [paragraph.text for paragraph in doc.paragraphs]
-                    )
-            case ".pptx":
-                if global_args.document_loading_engine == "DOCLING":
-                    content = await _process_with_enhanced_docling(file_path)
-                else:
-                    if not pm.is_installed("python-pptx"):  # type: ignore
-                        pm.install("pptx")
-                    from pptx import Presentation  # type: ignore
-                    from io import BytesIO
-
-                    pptx_file = BytesIO(file)
-                    prs = Presentation(pptx_file)
-                    for slide in prs.slides:
-                        for shape in slide.shapes:
-                            if hasattr(shape, "text"):
-                                content += shape.text + "\n"
-            case ".xlsx":
-                if global_args.document_loading_engine == "DOCLING":
-                    content = await _process_with_enhanced_docling(file_path)
-                else:
-                    if not pm.is_installed("openpyxl"):  # type: ignore
-                        pm.install("openpyxl")
-                    from openpyxl import load_workbook  # type: ignore
-                    from io import BytesIO
-
-                    xlsx_file = BytesIO(file)
-                    wb = load_workbook(xlsx_file)
-                    for sheet in wb:
-                        content += f"Sheet: {sheet.title}\n"
-                        for row in sheet.iter_rows(values_only=True):
-                            content += (
-                                "\t".join(
-                                    str(cell) if cell is not None else ""
-                                    for cell in row
-                                )
-                                + "\n"
-                            )
-                        content += "\n"
-            case _:
+            except UnicodeDecodeError:
                 logger.error(
-                    f"Unsupported file type: {file_path.name} (extension {ext})"
+                    f"File {file_path.name} is not valid UTF-8 encoded text. Please convert it to UTF-8 before processing."
                 )
                 return False
+        elif ext == ".pdf":
+            if global_args.document_loading_engine == "DOCLING":
+                content = await _process_with_enhanced_docling(file_path)
+            else:
+                if not pm.is_installed("pypdf2"):  # type: ignore
+                    pm.install("pypdf2")
+                from io import BytesIO
+
+                from PyPDF2 import PdfReader  # type: ignore
+
+                pdf_file = BytesIO(file)
+                reader = PdfReader(pdf_file)
+                for page in reader.pages:
+                    content += page.extract_text() + "\n"
+        elif ext == ".docx":
+            if global_args.document_loading_engine == "DOCLING":
+                content = await _process_with_enhanced_docling(file_path)
+            else:
+                if not pm.is_installed("python-docx"):  # type: ignore
+                    try:
+                        pm.install("python-docx")
+                    except Exception:
+                        pm.install("docx")
+                from io import BytesIO
+
+                from docx import Document  # type: ignore
+
+                docx_file = BytesIO(file)
+                doc = Document(docx_file)
+                content = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+        elif ext == ".pptx":
+            if global_args.document_loading_engine == "DOCLING":
+                content = await _process_with_enhanced_docling(file_path)
+            else:
+                if not pm.is_installed("python-pptx"):  # type: ignore
+                    pm.install("pptx")
+                from io import BytesIO
+
+                from pptx import Presentation  # type: ignore
+
+                pptx_file = BytesIO(file)
+                prs = Presentation(pptx_file)
+                for slide in prs.slides:
+                    for shape in slide.shapes:
+                        if hasattr(shape, "text"):
+                            content += shape.text + "\n"
+        elif ext == ".xlsx":
+            if global_args.document_loading_engine == "DOCLING":
+                content = await _process_with_enhanced_docling(file_path)
+            else:
+                if not pm.is_installed("openpyxl"):  # type: ignore
+                    pm.install("openpyxl")
+                from io import BytesIO
+
+                from openpyxl import load_workbook  # type: ignore
+
+                xlsx_file = BytesIO(file)
+                wb = load_workbook(xlsx_file)
+                for sheet in wb:
+                    content += f"Sheet: {sheet.title}\n"
+                    for row in sheet.iter_rows(values_only=True):
+                        content += (
+                            "\t".join(
+                                str(cell) if cell is not None else "" for cell in row
+                            )
+                            + "\n"
+                        )
+                    content += "\n"
+        else:
+            logger.error(f"Unsupported file type: {file_path.name} (extension {ext})")
+            return False
 
         # Insert into the RAG queue
         if content:
@@ -999,7 +1000,9 @@ async def pipeline_enqueue_file(
     return False, ""
 
 
-async def pipeline_index_file(rag: LightRAG, file_path: Path, track_id: str = None):
+async def pipeline_index_file(
+    rag: LightRAG, file_path: Path, track_id: Optional[str] = None
+):
     """Index a file with track_id
 
     Args:
@@ -1020,7 +1023,7 @@ async def pipeline_index_file(rag: LightRAG, file_path: Path, track_id: str = No
 
 
 async def pipeline_index_files(
-    rag: LightRAG, file_paths: List[Path], track_id: str = None
+    rag: LightRAG, file_paths: List[Path], track_id: Optional[str] = None
 ):
     """Index multiple files sequentially to avoid high CPU load
 
@@ -1055,8 +1058,8 @@ async def pipeline_index_files(
 async def pipeline_index_texts(
     rag: LightRAG,
     texts: List[str],
-    file_sources: List[str] = None,
-    track_id: str = None,
+    file_sources: Optional[List[str]] = None,
+    track_id: Optional[str] = None,
 ):
     """Index a list of texts with track_id
 
@@ -1081,7 +1084,7 @@ async def pipeline_index_texts(
 
 
 async def run_scanning_process(
-    rag: LightRAG, doc_manager: DocumentManager, track_id: str = None
+    rag: LightRAG, doc_manager: DocumentManager, track_id: Optional[str] = None
 ):
     """Background task to scan and index documents
 
@@ -1657,8 +1660,8 @@ def create_document_routes(
         """
         try:
             from lightrag.kg.shared_storage import (
-                get_namespace_data,
                 get_all_update_flags_status,
+                get_namespace_data,
             )
 
             pipeline_status = await get_namespace_data("pipeline_status")

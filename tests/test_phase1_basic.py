@@ -4,11 +4,12 @@ Basic functionality test for LightRAG Authentication Phase 1.
 Tests core components without requiring full test suite setup.
 """
 
-import pytest
 import os
 import sys
 import tempfile
 from pathlib import Path
+
+import pytest
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -16,17 +17,17 @@ sys.path.insert(0, str(Path(__file__).parent))
 from lightrag.api.auth.password_manager import (
     PasswordManager,
 )
-from lightrag.api.middleware.rate_limiter import AdvancedRateLimiter, RateLimitConfig
-from lightrag.api.middleware.security_headers import (
-    SecurityHeadersConfig,
-    SecurityAnalyzer,
-)
 from lightrag.api.logging.audit_logger import (
-    AuditLogger,
     AuditEvent,
     AuditEventType,
-    AuditSeverity,
     AuditLogConfig,
+    AuditLogger,
+    AuditSeverity,
+)
+from lightrag.api.middleware.rate_limiter import AdvancedRateLimiter, RateLimitConfig
+from lightrag.api.middleware.security_headers import (
+    SecurityAnalyzer,
+    SecurityHeadersConfig,
 )
 
 

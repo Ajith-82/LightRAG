@@ -1,29 +1,31 @@
 from __future__ import annotations
-import weakref
 
 import asyncio
-import html
 import csv
+import html
 import json
 import logging
 import logging.handlers
 import os
 import re
 import uuid
+import weakref
 from dataclasses import dataclass
 from datetime import datetime
 from functools import wraps
 from hashlib import md5
-from typing import Any, Protocol, Callable, TYPE_CHECKING, List
+from typing import TYPE_CHECKING, Any, Callable, List, Protocol
+
 import numpy as np
 from dotenv import load_dotenv
+
 from lightrag.constants import (
-    DEFAULT_LOG_MAX_BYTES,
     DEFAULT_LOG_BACKUP_COUNT,
     DEFAULT_LOG_FILENAME,
-    GRAPH_FIELD_SEP,
-    DEFAULT_MAX_TOTAL_TOKENS,
+    DEFAULT_LOG_MAX_BYTES,
     DEFAULT_MAX_FILE_PATH_LENGTH,
+    DEFAULT_MAX_TOTAL_TOKENS,
+    GRAPH_FIELD_SEP,
 )
 
 
@@ -296,7 +298,7 @@ def compute_args_hash(*args: Any) -> str:
     args_str = "".join([str(arg) for arg in args])
 
     # Compute MD5 hash
-    return hashlib.md5(args_str.encode()).hexdigest()
+    return hashlib.md5(args_str.encode(), usedforsecurity=False).hexdigest()
 
 
 def generate_cache_key(mode: str, cache_type: str, hash_value: str) -> str:
@@ -334,7 +336,7 @@ def compute_mdhash_id(content: str, prefix: str = "") -> str:
 
     The ID is a combination of the given prefix and the MD5 hash of the content string.
     """
-    return prefix + md5(content.encode()).hexdigest()
+    return prefix + md5(content.encode(), usedforsecurity=False).hexdigest()
 
 
 # Custom exception class

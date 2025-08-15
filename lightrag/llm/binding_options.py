@@ -5,8 +5,8 @@ This module provides container implementations for various Large Language Model
 bindings and integrations.
 """
 
-from argparse import ArgumentParser, Namespace
 import argparse
+from argparse import ArgumentParser, Namespace
 from dataclasses import asdict, dataclass
 from typing import Any, ClassVar
 
@@ -409,8 +409,9 @@ class OllamaLLMOptions(_OllamaOptionsMixin, BindingOptions):
 
 if __name__ == "__main__":
     import sys
-    import dotenv
     from io import StringIO
+
+    import dotenv
 
     print(BindingOptions.generate_dot_env_sample())
 

@@ -1,11 +1,12 @@
+import asyncio
+import configparser
 import os
 import time
 from dataclasses import dataclass, field
-import numpy as np
-import configparser
-import asyncio
+from typing import Any, Optional, Union, final
 
-from typing import Any, Union, final
+import numpy as np
+import pipmaster as pm
 
 from ..base import (
     BaseGraphStorage,
@@ -15,21 +16,19 @@ from ..base import (
     DocStatus,
     DocStatusStorage,
 )
-from ..utils import logger, compute_mdhash_id
-from ..types import KnowledgeGraph, KnowledgeGraphNode, KnowledgeGraphEdge
 from ..constants import GRAPH_FIELD_SEP
-
-import pipmaster as pm
+from ..types import KnowledgeGraph, KnowledgeGraphEdge, KnowledgeGraphNode
+from ..utils import compute_mdhash_id, logger
 
 if not pm.is_installed("pymongo"):
     pm.install("pymongo")
 
 from pymongo import AsyncMongoClient  # type: ignore
 from pymongo import UpdateOne  # type: ignore
-from pymongo.asynchronous.database import AsyncDatabase  # type: ignore
 from pymongo.asynchronous.collection import AsyncCollection  # type: ignore
-from pymongo.operations import SearchIndexModel  # type: ignore
+from pymongo.asynchronous.database import AsyncDatabase  # type: ignore
 from pymongo.errors import PyMongoError  # type: ignore
+from pymongo.operations import SearchIndexModel  # type: ignore
 
 config = configparser.ConfigParser()
 config.read("config.ini", "utf-8")
@@ -127,7 +126,7 @@ class MongoKVStorage(BaseKVStorage):
             self.db = None
             self._data = None
 
-    async def get_by_id(self, id: str) -> dict[str, Any] | None:
+    async def get_by_id(self, id: str) -> Optional[dict[str, Any]]:
         # Unified handling for flattened keys
         doc = await self._data.find_one({"_id": id})
         if doc:
@@ -232,7 +231,7 @@ class MongoKVStorage(BaseKVStorage):
         except PyMongoError as e:
             logger.error(f"Error deleting documents from {self.namespace}: {e}")
 
-    async def drop_cache_by_modes(self, modes: list[str] | None = None) -> bool:
+    async def drop_cache_by_modes(self, modes: Optional[list[str]] = None) -> bool:
         """Delete specific records from storage by cache mode
 
         Args:
@@ -645,7 +644,7 @@ class MongoGraphStorage(BaseGraphStorage):
     # -------------------------------------------------------------------------
     #
 
-    async def get_node(self, node_id: str) -> dict[str, str] | None:
+    async def get_node(self, node_id: str) -> Optional[dict[str, str]]:
         """
         Return the full node document, or None if missing.
         """
@@ -669,7 +668,9 @@ class MongoGraphStorage(BaseGraphStorage):
             }
         )
 
-    async def get_node_edges(self, source_node_id: str) -> list[tuple[str, str]] | None:
+    async def get_node_edges(
+        self, source_node_id: str
+    ) -> Optional[list[tuple[str, str]]]:
         """
         Retrieves all edges (relationships) for a particular node identified by its label.
 
@@ -1387,8 +1388,8 @@ class MongoGraphStorage(BaseGraphStorage):
 @final
 @dataclass
 class MongoVectorDBStorage(BaseVectorStorage):
-    db: AsyncDatabase | None = field(default=None)
-    _data: AsyncCollection | None = field(default=None)
+    db: Optional[AsyncDatabase] = field(default=None)
+    _data: Optional[AsyncCollection] = field(default=None)
     _index_name: str = field(default="", init=False)
 
     def __init__(
@@ -1534,7 +1535,7 @@ class MongoVectorDBStorage(BaseVectorStorage):
         return list_data
 
     async def query(
-        self, query: str, top_k: int, ids: list[str] | None = None
+        self, query: str, top_k: int, ids: Optional[list[str]] = None
     ) -> list[dict[str, Any]]:
         """Queries the vector database using Atlas Vector Search."""
         # Generate the embedding
@@ -1657,7 +1658,7 @@ class MongoVectorDBStorage(BaseVectorStorage):
             logger.error(f"Error searching by prefix in {self.namespace}: {str(e)}")
             return []
 
-    async def get_by_id(self, id: str) -> dict[str, Any] | None:
+    async def get_by_id(self, id: str) -> Optional[dict[str, Any]]:
         """Get vector data by its ID
 
         Args:

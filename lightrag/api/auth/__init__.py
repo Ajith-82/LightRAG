@@ -5,8 +5,8 @@ Enhanced authentication system with password security, rate limiting,
 security headers, and comprehensive audit logging.
 """
 
-from .password_manager import PasswordManager, PasswordPolicy, PasswordStrength
 from .handler import get_auth_handler
+from .password_manager import PasswordManager, PasswordPolicy, PasswordStrength
 
 __all__ = ["PasswordManager", "PasswordPolicy", "PasswordStrength", "auth_handler"]
 

@@ -4,10 +4,10 @@ Docling service client for LightRAG integration.
 
 from .client import DoclingClient
 from .exceptions import (
-    DoclingServiceError,
-    DoclingServiceUnavailable,
-    DoclingServiceTimeout,
     DoclingProcessingError,
+    DoclingServiceError,
+    DoclingServiceTimeout,
+    DoclingServiceUnavailable,
 )
 
 __all__ = [

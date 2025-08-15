@@ -1,22 +1,22 @@
+import asyncio
+import json
 import os
 import time
-import asyncio
-from typing import Any, final
-import json
-import numpy as np
 from dataclasses import dataclass
+from typing import Any, Optional, final
 
-from lightrag.utils import logger, compute_mdhash_id
+# You must manually install faiss-cpu or faiss-gpu before using FAISS vector db
+import faiss  # type: ignore
+import numpy as np
+
 from lightrag.base import BaseVectorStorage
+from lightrag.utils import compute_mdhash_id, logger
 
 from .shared_storage import (
     get_storage_lock,
     get_update_flag,
     set_all_update_flags,
 )
-
-# You must manually install faiss-cpu or faiss-gpu before using FAISS vector db
-import faiss  # type: ignore
 
 
 @final
@@ -200,7 +200,7 @@ class FaissVectorDBStorage(BaseVectorStorage):
         return [m["__id__"] for m in list_data]
 
     async def query(
-        self, query: str, top_k: int, ids: list[str] | None = None
+        self, query: str, top_k: int, ids: Optional[list[str]] = None
     ) -> list[dict[str, Any]]:
         """
         Search by a textual query; returns top_k results with their metadata + similarity distance.
@@ -411,7 +411,7 @@ class FaissVectorDBStorage(BaseVectorStorage):
 
         return True  # Return success
 
-    async def get_by_id(self, id: str) -> dict[str, Any] | None:
+    async def get_by_id(self, id: str) -> Optional[dict[str, Any]]:
         """Get vector data by its ID
 
         Args:

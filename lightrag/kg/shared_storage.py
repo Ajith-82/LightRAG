@@ -1,12 +1,12 @@
+import asyncio
+import logging
+import multiprocessing as mp
 import os
 import sys
-import asyncio
-import multiprocessing as mp
-from multiprocessing.synchronize import Lock as ProcessLock
-from multiprocessing import Manager
 import time
-import logging
-from typing import Any, Dict, List, Optional, Union, TypeVar, Generic
+from multiprocessing import Manager
+from multiprocessing.synchronize import Lock as ProcessLock
+from typing import Any, Dict, Generic, List, Optional, TypeVar, Union
 
 
 # Define a direct print function for critical logs that must be visible in all processes
@@ -872,7 +872,9 @@ def get_graph_db_lock(enable_logging: bool = False) -> UnifiedLock:
 
 
 def get_storage_keyed_lock(
-    keys: str | list[str], namespace: str = "default", enable_logging: bool = False
+    keys: Union[str, list[str]],
+    namespace: str = "default",
+    enable_logging: bool = False,
 ) -> _KeyedLockContext:
     """Return unified storage keyed lock for ensuring atomic operations across different namespaces"""
     global _storage_keyed_lock

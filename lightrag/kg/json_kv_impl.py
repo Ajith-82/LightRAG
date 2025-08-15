@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass
-from typing import Any, final
+from typing import Any, Optional, final
 
 from lightrag.base import (
     BaseKVStorage,
@@ -10,13 +10,14 @@ from lightrag.utils import (
     logger,
     write_json,
 )
+
 from .shared_storage import (
+    clear_all_update_flags,
+    get_data_init_lock,
     get_namespace_data,
     get_storage_lock,
-    get_data_init_lock,
     get_update_flag,
     set_all_update_flags,
-    clear_all_update_flags,
     try_initialize_namespace,
 )
 
@@ -127,7 +128,7 @@ class JsonKVStorage(BaseKVStorage):
                     result[key] = value
             return result
 
-    async def get_by_id(self, id: str) -> dict[str, Any] | None:
+    async def get_by_id(self, id: str) -> Optional[dict[str, Any]]:
         async with self._storage_lock:
             result = self._data.get(id)
             if result:
@@ -219,7 +220,7 @@ class JsonKVStorage(BaseKVStorage):
             if any_deleted:
                 await set_all_update_flags(self.namespace)
 
-    async def drop_cache_by_modes(self, modes: list[str] | None = None) -> bool:
+    async def drop_cache_by_modes(self, modes: Optional[list[str]] = None) -> bool:
         """Delete specific records from storage by cache mode
 
         Importance notes for in-memory storage:

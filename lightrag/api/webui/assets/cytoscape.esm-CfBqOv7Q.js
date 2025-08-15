@@ -19,9 +19,9 @@ https://github.com/jquery/jquery/blob/master/src/event.js
 
       uniform mat3 uPanZoomMatrix;
       uniform int  uAtlasSize;
-      
+
       // instanced
-      in vec2 aPosition; 
+      in vec2 aPosition;
 
       in mat3 aTransform;
 
@@ -30,7 +30,7 @@ https://github.com/jquery/jquery/blob/master/src/event.js
 
       // for picking
       in vec4 aIndex;
-      
+
       // For textures
       in int aAtlasId; // which shader unit/atlas to use
       in vec4 aTex; // x/y/w/h of texture in atlas
@@ -88,7 +88,7 @@ https://github.com/jquery/jquery/blob/master/src/event.js
 
           gl_Position = vec4(uPanZoomMatrix * vec3(point, 1.0), 1.0);
           vColor = aColor;
-        } 
+        }
         else if(aVertType == `).concat(kl,`) {
           vec2 pointA = aPointAPointB.xy;
           vec2 pointB = aPointAPointB.zw;
@@ -135,7 +135,7 @@ https://github.com/jquery/jquery/blob/master/src/event.js
           }
 
           vColor = aColor;
-        } 
+        }
         else if(aVertType == `).concat(vs,` && vid < 3) {
           // massage the first triangle into an edge arrow
           if(vid == 0)
@@ -179,7 +179,7 @@ https://github.com/jquery/jquery/blob/master/src/event.js
 	else `),`
         } else if(vVertType == `).concat(vs,`) {
           // blend arrow color with background (using premultiplied alpha)
-          outColor.rgb = vColor.rgb + (uBGColor.rgb * (1.0 - vColor.a)); 
+          outColor.rgb = vColor.rgb + (uBGColor.rgb * (1.0 - vColor.a));
           outColor.a = 1.0; // make opaque, masks out line under arrow
         } else {
           outColor = vColor;

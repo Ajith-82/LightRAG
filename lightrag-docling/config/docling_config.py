@@ -2,10 +2,11 @@
 Configuration management for the Docling service.
 """
 
-from typing import Dict, Any, Optional
-from pydantic_settings import BaseSettings
-from pydantic import Field, validator
 from pathlib import Path
+from typing import Any, Dict, Optional
+
+from pydantic import Field, validator
+from pydantic_settings import BaseSettings
 
 
 class DoclingServiceSettings(BaseSettings):

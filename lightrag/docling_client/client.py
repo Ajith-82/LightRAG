@@ -11,14 +11,15 @@ from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urljoin
 
 import httpx
+
 from lightrag.utils import get_env_value
 
 from .exceptions import (
-    DoclingServiceError,
-    DoclingServiceUnavailable,
-    DoclingServiceTimeout,
-    DoclingProcessingError,
     DoclingConfigurationError,
+    DoclingProcessingError,
+    DoclingServiceError,
+    DoclingServiceTimeout,
+    DoclingServiceUnavailable,
 )
 from .service_discovery import service_discovery
 

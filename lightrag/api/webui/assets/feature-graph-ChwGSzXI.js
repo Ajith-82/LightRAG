@@ -371,7 +371,7 @@ void main() {
   vec2 sourceCompensationVector =
     vec2(-sourceDirection * unitNormal.y, sourceDirection * unitNormal.x)
     * (webGLSourceRadius + webGLSourceArrowHeadLength);
-    
+
   // Target arrow head
   float targetRadius = a_targetRadius * a_targetRadiusCoef;
   float targetDirection = sign(targetRadius);
@@ -678,7 +678,7 @@ void main() {
 
   position = viewportToClipspace(viewportOffsetPosition, u_dimensions);
   gl_Position = vec4(position, 0, 1);
-    
+
 `).concat(r?`
   v_targetSize = a_targetSize * u_pixelRatio / u_sizeRatio;
   v_targetPoint = viewportTarget;

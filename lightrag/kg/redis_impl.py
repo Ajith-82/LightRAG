@@ -1,35 +1,37 @@
-import os
-from typing import Any, final, Union
-from dataclasses import dataclass
-import pipmaster as pm
 import configparser
-from contextlib import asynccontextmanager
+import os
 import threading
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from typing import Any, Optional, Union, final
+
+import pipmaster as pm
 
 if not pm.is_installed("redis"):
     pm.install("redis")
 
-# aioredis is a depricated library, replaced with redis
-from redis.asyncio import Redis, ConnectionPool  # type: ignore
-from redis.exceptions import RedisError, ConnectionError, TimeoutError  # type: ignore
-from lightrag.utils import logger
-
-from lightrag.base import (
-    BaseKVStorage,
-    DocStatusStorage,
-    DocStatus,
-    DocProcessingStatus,
-)
 import json
+
+# aioredis is a depricated library, replaced with redis
+from redis.asyncio import ConnectionPool, Redis  # type: ignore
+from redis.exceptions import ConnectionError, RedisError, TimeoutError  # type: ignore
 
 # Import tenacity for retry logic
 from tenacity import (
+    before_sleep_log,
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
-    before_sleep_log,
 )
+
+from lightrag.base import (
+    BaseKVStorage,
+    DocProcessingStatus,
+    DocStatus,
+    DocStatusStorage,
+)
+from lightrag.utils import logger
 
 config = configparser.ConfigParser()
 config.read("config.ini", "utf-8")
@@ -242,7 +244,7 @@ class RedisKVStorage(BaseKVStorage):
         await self.close()
 
     @redis_retry
-    async def get_by_id(self, id: str) -> dict[str, Any] | None:
+    async def get_by_id(self, id: str) -> Optional[dict[str, Any]]:
         async with self._get_redis_connection() as redis:
             try:
                 data = await redis.get(f"{self.namespace}:{id}")
@@ -397,7 +399,7 @@ class RedisKVStorage(BaseKVStorage):
                 f"Deleted {deleted_count} of {len(ids)} entries from {self.namespace}"
             )
 
-    async def drop_cache_by_modes(self, modes: list[str] | None = None) -> bool:
+    async def drop_cache_by_modes(self, modes: Optional[list[str]] = None) -> bool:
         """Delete specific records from storage by cache mode
 
         Importance notes for Redis storage:

@@ -3,9 +3,9 @@ Fallback document processors for when Docling service is unavailable.
 """
 
 import logging
+import time
 from pathlib import Path
 from typing import Any, Dict
-import time
 
 import pipmaster as pm
 

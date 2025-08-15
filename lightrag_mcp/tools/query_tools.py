@@ -7,12 +7,12 @@ streaming responses, and comprehensive result formatting.
 
 import asyncio
 import logging
-from typing import Dict, Any, AsyncIterator, Literal
+from typing import Any, AsyncIterator, Dict, Literal
 
 from ..client.api_client import get_api_client
 from ..client.direct_client import LightRAGDirectClient
 from ..config import get_config
-from ..utils import Validator, MCPError, Cache
+from ..utils import Cache, MCPError, Validator
 
 logger = logging.getLogger("lightrag-mcp.query_tools")
 

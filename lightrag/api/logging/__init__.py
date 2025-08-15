@@ -5,11 +5,11 @@ Comprehensive audit logging and security event tracking.
 """
 
 from .audit_logger import (
-    AuditLogger,
     AuditEvent,
     AuditEventType,
-    AuditSeverity,
     AuditLogConfig,
+    AuditLogger,
+    AuditSeverity,
 )
 
 __all__ = [
