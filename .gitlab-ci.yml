@@ -123,7 +123,7 @@ build-python:
     - python -m venv test_env
     - source test_env/bin/activate
     - pip install dist/*.whl
-    - python -c "import lightrag; print(f'LightRAG version: {lightrag.__version__}')"
+    - python -c "import lightrag; print('LightRAG version: ' + lightrag.__version__)"
 
     - echo "✅ Python package built successfully"
   artifacts:

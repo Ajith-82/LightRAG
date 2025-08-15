@@ -12,6 +12,7 @@ repos:
         exclude: '\.md$'
       - id: check-yaml
         args: ['--unsafe']
+        exclude: '^k8s-deploy/.*\.yaml$|^.*\.tpl$'
       - id: check-json
       - id: check-toml
       - id: check-xml
