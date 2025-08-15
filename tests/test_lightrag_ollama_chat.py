@@ -19,7 +19,7 @@ from typing import Any, Callable, Dict, List
 import pytest
 import requests
 
-from tests.ollama_test_helpers import OllamaTestResult, OllamaTestStats
+from tests.test_ollama_helpers import OllamaTestResult, OllamaTestStats
 
 
 class ErrorCode(Enum):
