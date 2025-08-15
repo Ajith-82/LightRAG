@@ -34,29 +34,29 @@ log_error() {
 
 check_dependencies() {
     log_info "Checking required dependencies..."
-    
+
     if ! command -v python3 &> /dev/null; then
         log_error "Python 3 is required but not installed"
         exit 1
     fi
-    
+
     if ! python3 -c "import coverage" 2>/dev/null; then
         log_error "Coverage package not found. Install with: pip install coverage[toml]"
         exit 1
     fi
-    
+
     log_success "All dependencies found"
 }
 
 run_coverage_analysis() {
     log_info "Running coverage analysis..."
-    
+
     cd "$PROJECT_ROOT"
-    
+
     # Check if coverage data exists
     if [[ ! -f .coverage ]] && [[ ! -f coverage.xml ]]; then
         log_warning "No coverage data found. Running tests with coverage..."
-        
+
         # Run tests with coverage
         python -m pytest tests/ \
             --cov=lightrag \
@@ -69,26 +69,26 @@ run_coverage_analysis() {
     else
         log_info "Using existing coverage data"
     fi
-    
+
     # Generate reports
     log_info "Generating coverage reports..."
-    
+
     # Terminal report
     coverage report --show-missing
-    
+
     # HTML report
     coverage html --directory htmlcov
-    
+
     # XML report for CI/CD tools
     coverage xml -o coverage.xml
-    
+
     # JSON report for further processing
     coverage json -o coverage.json
 }
 
 check_coverage_threshold() {
     log_info "Checking coverage threshold (minimum: ${COVERAGE_THRESHOLD}%)..."
-    
+
     # Get overall coverage percentage
     if [[ -f coverage.json ]]; then
         ACTUAL_COVERAGE=$(python3 -c "
@@ -101,9 +101,9 @@ print(f\"{data['totals']['percent_covered']:.2f}\")
         # Fallback to parsing coverage report
         ACTUAL_COVERAGE=$(coverage report | grep TOTAL | awk '{print $4}' | sed 's/%//')
     fi
-    
+
     log_info "Actual coverage: ${ACTUAL_COVERAGE}%"
-    
+
     # Compare with threshold
     if (( $(echo "$ACTUAL_COVERAGE >= $COVERAGE_THRESHOLD" | bc -l) )); then
         log_success "Coverage threshold met: ${ACTUAL_COVERAGE}% >= ${COVERAGE_THRESHOLD}%"
@@ -116,14 +116,14 @@ print(f\"{data['totals']['percent_covered']:.2f}\")
 
 check_individual_file_coverage() {
     log_info "Checking individual file coverage..."
-    
+
     # Files that should have high coverage (>80%)
     HIGH_COVERAGE_FILES=(
         "lightrag/lightrag.py"
         "lightrag/base.py"
         "lightrag/utils.py"
     )
-    
+
     # Files that are allowed lower coverage (<50%)
     LOW_COVERAGE_ALLOWED=(
         "lightrag/llm/"
@@ -131,9 +131,9 @@ check_individual_file_coverage() {
         "examples/"
         "tests/"
     )
-    
+
     FAILED_FILES=()
-    
+
     if [[ -f coverage.json ]]; then
         python3 << 'EOF'
 import json
@@ -145,7 +145,7 @@ with open('coverage.json', 'r') as f:
 failed_files = []
 high_coverage_files = [
     "lightrag/lightrag.py",
-    "lightrag/base.py", 
+    "lightrag/base.py",
     "lightrag/utils.py"
 ]
 
@@ -158,11 +158,11 @@ low_coverage_allowed = [
 
 for file_path, file_data in data['files'].items():
     coverage_percent = file_data['summary']['percent_covered']
-    
+
     # Check if file should have high coverage
     is_high_coverage_file = any(hcf in file_path for hcf in high_coverage_files)
     is_low_coverage_allowed = any(lca in file_path for lca in low_coverage_allowed)
-    
+
     if is_high_coverage_file and coverage_percent < 80:
         print(f"❌ {file_path}: {coverage_percent:.1f}% (should be >80%)")
         failed_files.append(file_path)
@@ -182,7 +182,7 @@ EOF
 
 generate_coverage_badge() {
     log_info "Generating coverage badge..."
-    
+
     if [[ -f coverage.json ]]; then
         COVERAGE_PERCENT=$(python3 -c "
 import json
@@ -190,7 +190,7 @@ with open('coverage.json', 'r') as f:
     data = json.load(f)
 print(int(data['totals']['percent_covered']))
 ")
-        
+
         # Determine badge color
         if (( COVERAGE_PERCENT >= 90 )); then
             COLOR="brightgreen"
@@ -203,10 +203,10 @@ print(int(data['totals']['percent_covered']))
         else
             COLOR="red"
         fi
-        
+
         # Generate badge URL
         BADGE_URL="https://img.shields.io/badge/coverage-${COVERAGE_PERCENT}%25-${COLOR}"
-        
+
         log_info "Coverage badge: $BADGE_URL"
         echo "$BADGE_URL" > coverage-badge.txt
     fi
@@ -214,7 +214,7 @@ print(int(data['totals']['percent_covered']))
 
 analyze_coverage_trends() {
     log_info "Analyzing coverage trends..."
-    
+
     # Check if previous coverage data exists
     if [[ -f coverage-history.json ]]; then
         python3 << 'EOF'
@@ -254,7 +254,7 @@ with open(history_file, 'w') as f:
 if len(history['entries']) >= 2:
     previous_coverage = history['entries'][-2]['coverage']
     change = current_coverage - previous_coverage
-    
+
     if change > 0:
         print(f"📈 Coverage improved by {change:.2f}% (from {previous_coverage:.2f}% to {current_coverage:.2f}%)")
     elif change < 0:
@@ -271,7 +271,7 @@ EOF
 
 generate_coverage_summary() {
     log_info "Generating coverage summary..."
-    
+
     cat > coverage-summary.md << EOF
 # Coverage Report Summary
 
@@ -317,24 +317,24 @@ main() {
     log_info "Starting coverage analysis..."
     log_info "Project root: $PROJECT_ROOT"
     log_info "Coverage threshold: $COVERAGE_THRESHOLD%"
-    
+
     check_dependencies
-    
+
     cd "$PROJECT_ROOT"
-    
+
     run_coverage_analysis
-    
+
     # Check thresholds
     THRESHOLD_PASSED=true
     if ! check_coverage_threshold; then
         THRESHOLD_PASSED=false
     fi
-    
+
     # Additional checks
     check_individual_file_coverage || true
     generate_coverage_badge
     analyze_coverage_trends
-    
+
     # Set ACTUAL_COVERAGE for summary
     if [[ -f coverage.json ]]; then
         ACTUAL_COVERAGE=$(python3 -c "
@@ -344,9 +344,9 @@ with open('coverage.json', 'r') as f:
 print(f\"{data['totals']['percent_covered']:.2f}\")
 ")
     fi
-    
+
     generate_coverage_summary
-    
+
     if [[ "$THRESHOLD_PASSED" == "true" ]]; then
         log_success "Coverage analysis completed successfully"
         exit 0

@@ -37,14 +37,14 @@ log_error() {
 
 check_dependencies() {
     log_info "Checking required dependencies..."
-    
+
     local missing_deps=()
-    
+
     # Check Python
     if ! command -v python3 &> /dev/null; then
         missing_deps+=("python3")
     fi
-    
+
     # Check required Python packages
     local python_packages=("ruff" "black" "isort" "mypy" "bandit")
     for package in "${python_packages[@]}"; do
@@ -52,39 +52,39 @@ check_dependencies() {
             missing_deps+=("python3-$package")
         fi
     done
-    
+
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
         log_error "Missing dependencies: ${missing_deps[*]}"
         log_info "Install with: pip install ruff black isort mypy bandit"
         exit 1
     fi
-    
+
     log_success "All dependencies found"
 }
 
 run_ruff_linting() {
     log_info "Running Ruff linting..."
-    
+
     local ruff_args=(
         "lightrag/"
         "lightrag_mcp/"
         "tests/"
     )
-    
+
     if [[ "$VERBOSE" == "true" ]]; then
         ruff_args+=("--verbose")
     fi
-    
+
     if [[ "$FIX_MODE" == "true" ]]; then
         ruff_args+=("--fix")
         log_info "Running in fix mode - will attempt to fix issues"
     fi
-    
+
     # Add output format for CI
     if [[ -n "${CI:-}" ]]; then
         ruff_args+=("--output-format=github")
     fi
-    
+
     # Run Ruff check
     if ruff check "${ruff_args[@]}"; then
         log_success "Ruff linting passed"
@@ -97,13 +97,13 @@ run_ruff_linting() {
 
 run_ruff_formatting() {
     log_info "Running Ruff formatting..."
-    
+
     local format_args=(
         "lightrag/"
         "lightrag_mcp/"
         "tests/"
     )
-    
+
     if [[ "$CHECK_ONLY" == "true" ]]; then
         format_args+=("--check")
         format_args+=("--diff")
@@ -111,7 +111,7 @@ run_ruff_formatting() {
     else
         log_info "Running in fix mode - will format files"
     fi
-    
+
     if ruff format "${format_args[@]}"; then
         log_success "Ruff formatting check passed"
         return 0
@@ -123,7 +123,7 @@ run_ruff_formatting() {
 
 run_black_formatting() {
     log_info "Running Black formatting check..."
-    
+
     local black_args=(
         "lightrag/"
         "lightrag_mcp/"
@@ -131,7 +131,7 @@ run_black_formatting() {
         "--line-length=88"
         "--target-version=py310"
     )
-    
+
     if [[ "$CHECK_ONLY" == "true" ]]; then
         black_args+=("--check")
         black_args+=("--diff")
@@ -139,11 +139,11 @@ run_black_formatting() {
     else
         log_info "Running in fix mode - will format files"
     fi
-    
+
     if [[ "$VERBOSE" == "true" ]]; then
         black_args+=("--verbose")
     fi
-    
+
     if black "${black_args[@]}"; then
         log_success "Black formatting check passed"
         return 0
@@ -155,7 +155,7 @@ run_black_formatting() {
 
 run_isort_check() {
     log_info "Running isort import sorting check..."
-    
+
     local isort_args=(
         "lightrag/"
         "lightrag_mcp/"
@@ -168,7 +168,7 @@ run_isort_check() {
         "--use-parentheses"
         "--ensure-newline-before-comments"
     )
-    
+
     if [[ "$CHECK_ONLY" == "true" ]]; then
         isort_args+=("--check-only")
         isort_args+=("--diff")
@@ -176,11 +176,11 @@ run_isort_check() {
     else
         log_info "Running in fix mode - will sort imports"
     fi
-    
+
     if [[ "$VERBOSE" == "true" ]]; then
         isort_args+=("--verbose")
     fi
-    
+
     if isort "${isort_args[@]}"; then
         log_success "isort check passed"
         return 0
@@ -192,7 +192,7 @@ run_isort_check() {
 
 run_mypy_check() {
     log_info "Running MyPy type checking..."
-    
+
     local mypy_args=(
         "lightrag/"
         "--ignore-missing-imports"
@@ -202,16 +202,16 @@ run_mypy_check() {
         "--warn-redundant-casts"
         "--warn-unreachable"
     )
-    
+
     if [[ "$VERBOSE" == "true" ]]; then
         mypy_args+=("--verbose")
     fi
-    
+
     # MyPy configuration file check
     if [[ -f "$PROJECT_ROOT/mypy.ini" || -f "$PROJECT_ROOT/pyproject.toml" ]]; then
         log_info "Using MyPy configuration file"
     fi
-    
+
     if mypy "${mypy_args[@]}"; then
         log_success "MyPy type checking passed"
         return 0
@@ -223,26 +223,26 @@ run_mypy_check() {
 
 run_bandit_security_check() {
     log_info "Running Bandit security check..."
-    
+
     local bandit_args=(
         "-r"
         "lightrag/"
         "lightrag_mcp/"
         "-ll"  # Low confidence, low severity threshold
     )
-    
+
     # Exclude test files from security checks
     bandit_args+=("-x" "tests/")
-    
+
     # Add format for CI
     if [[ -n "${CI:-}" ]]; then
         bandit_args+=("-f" "json" "-o" "bandit-report.json")
     fi
-    
+
     if [[ "$VERBOSE" == "true" ]]; then
         bandit_args+=("-v")
     fi
-    
+
     if bandit "${bandit_args[@]}"; then
         log_success "Bandit security check passed"
         return 0
@@ -254,7 +254,7 @@ run_bandit_security_check() {
 
 run_additional_checks() {
     log_info "Running additional code quality checks..."
-    
+
     # Check for TODO/FIXME comments
     log_info "Checking for TODO/FIXME comments..."
     local todo_count=$(grep -r "TODO\|FIXME\|XXX\|HACK" lightrag/ lightrag_mcp/ --exclude-dir=__pycache__ | wc -l || echo "0")
@@ -264,7 +264,7 @@ run_additional_checks() {
     else
         log_success "No TODO/FIXME comments found"
     fi
-    
+
     # Check for print statements (should use logging)
     log_info "Checking for print statements..."
     local print_count=$(grep -r "print(" lightrag/ lightrag_mcp/ --exclude-dir=__pycache__ --exclude="*test*" | wc -l || echo "0")
@@ -274,7 +274,7 @@ run_additional_checks() {
     else
         log_success "No print statements found"
     fi
-    
+
     # Check for long lines (>120 characters)
     log_info "Checking for long lines..."
     local long_lines=$(find lightrag/ lightrag_mcp/ -name "*.py" -exec grep -l ".\{121,\}" {} \; | wc -l || echo "0")
@@ -283,7 +283,7 @@ run_additional_checks() {
     else
         log_success "No overly long lines found"
     fi
-    
+
     # Check for missing docstrings in public functions
     log_info "Checking for missing docstrings..."
     python3 << 'EOF'
@@ -297,28 +297,28 @@ def check_docstrings(file_path):
             tree = ast.parse(f.read(), filename=file_path)
         except SyntaxError:
             return []
-    
+
     missing = []
-    
+
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)):
             # Skip private functions/classes
             if node.name.startswith('_'):
                 continue
-                
+
             # Check if has docstring
-            if not (node.body and isinstance(node.body[0], ast.Expr) 
+            if not (node.body and isinstance(node.body[0], ast.Expr)
                    and isinstance(node.body[0].value, ast.Constant)
                    and isinstance(node.body[0].value.value, str)):
                 missing.append(f"{file_path}:{node.lineno} - {node.__class__.__name__} '{node.name}' missing docstring")
-    
+
     return missing
 
 missing_docstrings = []
 for root, dirs, files in os.walk('lightrag'):
     # Skip test directories and deprecated code
     dirs[:] = [d for d in dirs if not d.startswith('.') and d != '__pycache__' and d != 'deprecated']
-    
+
     for file in files:
         if file.endswith('.py') and not file.startswith('test_'):
             file_path = os.path.join(root, file)
@@ -337,7 +337,7 @@ EOF
 
 generate_quality_report() {
     log_info "Generating code quality report..."
-    
+
     cat > code-quality-report.md << EOF
 # Code Quality Report
 
@@ -403,46 +403,46 @@ main() {
     log_info "Project root: $PROJECT_ROOT"
     log_info "Fix mode: $FIX_MODE"
     log_info "Check only: $CHECK_ONLY"
-    
+
     check_dependencies
-    
+
     cd "$PROJECT_ROOT"
-    
+
     local failed_checks=()
-    
+
     # Run all checks
     if ! run_ruff_linting; then
         failed_checks+=("ruff-lint")
     fi
-    
+
     if ! run_ruff_formatting; then
         failed_checks+=("ruff-format")
     fi
-    
+
     # Skip black if using ruff format
     # if ! run_black_formatting; then
     #     failed_checks+=("black")
     # fi
-    
+
     if ! run_isort_check; then
         failed_checks+=("isort")
     fi
-    
+
     if ! run_mypy_check; then
         # MyPy is non-blocking, don't add to failed_checks
         true
     fi
-    
+
     if ! run_bandit_security_check; then
         # Bandit is non-blocking, don't add to failed_checks
         true
     fi
-    
+
     # Additional checks (always non-blocking)
     run_additional_checks
-    
+
     generate_quality_report
-    
+
     # Final result
     if [[ ${#failed_checks[@]} -eq 0 ]]; then
         log_success "All code quality checks passed"

@@ -50,23 +50,23 @@ jobs:
         else
           VERSION=${GITHUB_REF#refs/tags/}
         fi
-        
+
         # Validate version format (semantic versioning)
         if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?(\+[a-zA-Z0-9]+)?$ ]]; then
           echo "❌ Invalid version format: $VERSION"
           echo "Expected format: v1.2.3, v1.2.3-beta1, v1.2.3+build123"
           exit 1
         fi
-        
+
         # Check if pre-release
         IS_PRERELEASE=false
         if [[ "$VERSION" =~ -[a-zA-Z] ]] || [[ "${{ github.event.inputs.prerelease }}" == "true" ]]; then
           IS_PRERELEASE=true
         fi
-        
+
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
-        
+
         echo "✅ Version: $VERSION"
         echo "✅ Pre-release: $IS_PRERELEASE"
 
@@ -85,13 +85,13 @@ jobs:
           repos/${{ github.repository }}/actions/workflows/ci.yml/runs \
           --jq ".workflow_runs[0] | select(.head_sha == \"${{ github.sha }}\") | .conclusion" \
           || echo "unknown")
-        
+
         if [[ "$CI_STATUS" != "success" ]]; then
           echo "❌ CI checks have not passed for this commit. Status: $CI_STATUS"
           echo "Cannot create release without passing CI checks."
           exit 1
         fi
-        
+
         echo "✅ CI checks passed for commit ${{ github.sha }}"
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -100,13 +100,13 @@ jobs:
       id: notes
       run: |
         echo "📝 Generating release notes for ${{ steps.version.outputs.version }}"
-        
+
         # Get previous tag
         PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-        
+
         if [[ -n "$PREV_TAG" ]]; then
           echo "Previous release: $PREV_TAG"
-          
+
           # Generate changelog since last tag
           CHANGELOG=$(git log ${PREV_TAG}..HEAD \
             --pretty=format:"- %s (%h)" \
@@ -118,28 +118,28 @@ jobs:
           echo "No previous tag found, this is the first release"
           CHANGELOG="- Initial release"
         fi
-        
+
         # Create release notes
         cat > release_notes.md << EOF
         ## What's Changed
-        
+
         $CHANGELOG
-        
+
         ## Installation
-        
+
         \`\`\`bash
         pip install lightrag-hku==${{ steps.version.outputs.version }}
         \`\`\`
-        
+
         ## Docker
-        
+
         \`\`\`bash
         docker pull ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
         \`\`\`
-        
+
         **Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${{ steps.version.outputs.version }}
         EOF
-        
+
         # Output for use in release
         echo 'release_notes<<EOF' >> $GITHUB_OUTPUT
         cat release_notes.md >> $GITHUB_OUTPUT
@@ -169,13 +169,13 @@ jobs:
       run: |
         VERSION="${{ needs.validate-release.outputs.version }}"
         VERSION_NUMBER=${VERSION#v}  # Remove 'v' prefix
-        
+
         # Update __init__.py
         sed -i "s/__version__ = .*/__version__ = \"$VERSION_NUMBER\"/" lightrag/__init__.py
-        
+
         # Update pyproject.toml if needed
         sed -i "s/version = .*/version = \"$VERSION_NUMBER\"/" pyproject.toml || true
-        
+
         echo "Updated version to: $VERSION_NUMBER"
 
     - name: Build Python package
@@ -185,7 +185,7 @@ jobs:
     - name: Verify package
       run: |
         python -m twine check dist/*
-        
+
         # Test install in clean environment
         python -m venv test_env
         source test_env/bin/activate
@@ -285,16 +285,16 @@ jobs:
         python -m venv test_wheel
         source test_wheel/bin/activate
         pip install --upgrade pip
-        
+
         # Install from wheel
         WHEEL_FILE=$(ls dist/*.whl | head -1)
         pip install "$WHEEL_FILE"
-        
+
         # Basic import test
         python -c "
         import lightrag
         print(f'✅ LightRAG version: {lightrag.__version__}')
-        
+
         # Test basic functionality
         from lightrag import LightRAG
         print('✅ LightRAG class imported successfully')
@@ -305,11 +305,11 @@ jobs:
         python -m venv test_sdist
         source test_sdist/bin/activate
         pip install --upgrade pip
-        
+
         # Install from source distribution
         SDIST_FILE=$(ls dist/*.tar.gz | head -1)
         pip install "$SDIST_FILE"
-        
+
         # Basic import test
         python -c "
         import lightrag
@@ -319,10 +319,10 @@ jobs:
     - name: Test Docker image
       run: |
         VERSION="${{ needs.validate-release.outputs.version }}"
-        
+
         # Pull and test the release image
         docker pull ghcr.io/${{ github.repository }}:$VERSION
-        
+
         # Basic container test
         docker run --rm ghcr.io/${{ github.repository }}:$VERSION python -c "
         import lightrag
@@ -358,7 +358,7 @@ jobs:
       with:
         script: |
           const fs = require('fs');
-          
+
           const release = await github.rest.repos.createRelease({
             owner: context.repo.owner,
             repo: context.repo.repo,
@@ -369,17 +369,17 @@ jobs:
             prerelease: ${{ needs.validate-release.outputs.is_prerelease }},
             generate_release_notes: false
           });
-          
+
           console.log(`Created release: ${release.data.html_url}`);
-          
+
           // Upload package files
           const globber = await glob.create('dist/*');
           const files = await globber.glob();
-          
+
           for (const file of files) {
             const name = require('path').basename(file);
             const data = fs.readFileSync(file);
-            
+
             await github.rest.repos.uploadReleaseAsset({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -387,7 +387,7 @@ jobs:
               name: name,
               data: data
             });
-            
+
             console.log(`Uploaded: ${name}`);
           }
 
@@ -415,18 +415,18 @@ jobs:
     - name: Verify PyPI publication
       run: |
         sleep 60  # Wait for PyPI to propagate
-        
+
         VERSION="${{ needs.validate-release.outputs.version }}"
         VERSION_NUMBER=${VERSION#v}
-        
+
         # Try to install from PyPI
         python -m venv verify_pypi
         source verify_pypi/bin/activate
         pip install --upgrade pip
-        
+
         # Install specific version from PyPI
         pip install "lightrag-hku==$VERSION_NUMBER" --no-cache-dir
-        
+
         python -c "
         import lightrag
         print(f'✅ Successfully installed from PyPI: {lightrag.__version__}')
@@ -446,13 +446,13 @@ jobs:
       run: |
         VERSION="${{ needs.validate-release.outputs.version }}"
         VERSION_NUMBER=${VERSION#v}
-        
+
         # Update README with new version
         if [ -f README.md ]; then
           sed -i "s/lightrag-hku==[0-9]\+\.[0-9]\+\.[0-9]\+/lightrag-hku==$VERSION_NUMBER/g" README.md
           sed -i "s/:v[0-9]\+\.[0-9]\+\.[0-9]\+/:$VERSION/g" README.md
         fi
-        
+
         # Update CHANGELOG
         if [ -f CHANGELOG.md ]; then
           sed -i "1i\\## $VERSION ($(date +%Y-%m-%d))\\n\\n${{ needs.validate-release.outputs.release_notes }}\\n" CHANGELOG.md
@@ -466,11 +466,11 @@ jobs:
         title: "📚 Update documentation for release ${{ needs.validate-release.outputs.version }}"
         body: |
           Automated documentation update for release ${{ needs.validate-release.outputs.version }}.
-          
+
           ## Changes
           - Updated version references in README.md
           - Updated CHANGELOG.md with release notes
-          
+
           This PR was automatically created by the release workflow.
         branch: docs/release-${{ needs.validate-release.outputs.version }}
         delete-branch: true
@@ -489,30 +489,30 @@ jobs:
           const version = '${{ needs.validate-release.outputs.version }}';
           const isPrerelease = ${{ needs.validate-release.outputs.is_prerelease }};
           const pypiPublished = '${{ needs.publish-pypi.result }}' === 'success';
-          
+
           let message = `🚀 **LightRAG ${version} Released!**\n\n`;
-          
+
           if (isPrerelease) {
             message += '⚠️ This is a pre-release version.\n\n';
           }
-          
+
           message += '## Installation\n\n';
-          
+
           if (pypiPublished) {
             message += `\`\`\`bash\npip install lightrag-hku==${version.substring(1)}\n\`\`\`\n\n`;
           }
-          
+
           message += '## Docker\n\n';
           message += `\`\`\`bash\ndocker pull ghcr.io/${{ github.repository }}:${version}\n\`\`\`\n\n`;
-          
+
           message += '## Links\n\n';
           message += `- [Release Notes](https://github.com/${{ github.repository }}/releases/tag/${version})\n`;
           message += `- [Full Changelog](https://github.com/${{ github.repository }}/releases/tag/${version})\n`;
-          
+
           if (pypiPublished) {
             message += `- [PyPI Package](https://pypi.org/project/lightrag-hku/${version.substring(1)}/)\n`;
           }
-          
+
           // Create a discussion or issue about the release
           await github.rest.repos.createCommitComment({
             owner: context.repo.owner,
@@ -528,6 +528,6 @@ jobs:
         echo "- PyPI Publication: ${{ needs.publish-pypi.result }}"
         echo "- Docker Images: ${{ needs.build-docker-release.result }}"
         echo "- Documentation: ${{ needs.update-documentation.result }}"
-        
+
         # Here you could send metrics to analytics services
         # Example: DataDog, New Relic, custom metrics endpoint

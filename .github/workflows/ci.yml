@@ -105,7 +105,7 @@ jobs:
         python-version: ['3.10', '3.11', '3.12']
         test-group: [
           'unit',
-          'integration', 
+          'integration',
           'api',
           'storage',
           'security',
@@ -308,10 +308,10 @@ jobs:
         echo "NODE_ENV=test" >> .env
         docker compose -f docker-compose.yml up -d --wait
         sleep 30
-        
+
         # Health checks
         curl -f http://localhost:9621/health || exit 1
-        
+
         # Cleanup
         docker compose -f docker-compose.yml down
 
@@ -322,11 +322,11 @@ jobs:
         echo "DEBUG=false" >> .env
         docker compose -f docker-compose.production.yml up -d --wait
         sleep 45
-        
+
         # Health checks
         curl -f http://localhost:9621/health || exit 1
         curl -f http://localhost:9621/api/health || exit 1
-        
+
         # Cleanup
         docker compose -f docker-compose.production.yml down
 

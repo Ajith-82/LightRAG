@@ -23,23 +23,23 @@ import{r as c,a as zr,b as mt,c as Gr,R as be}from"./react-vendor-DEwriMA6.js";v
     margin-right: `).concat(a,"px ").concat(o,`;
     `),n==="padding"&&"padding-right: ".concat(a,"px ").concat(o,";")].filter(Boolean).join(""),`
   }
-  
+
   .`).concat(it,` {
     right: `).concat(a,"px ").concat(o,`;
   }
-  
+
   .`).concat(st,` {
     margin-right: `).concat(a,"px ").concat(o,`;
   }
-  
+
   .`).concat(it," .").concat(it,` {
     right: 0 `).concat(o,`;
   }
-  
+
   .`).concat(st," .").concat(st,` {
     margin-right: 0 `).concat(o,`;
   }
-  
+
   body[`).concat(_e,`] {
     `).concat(Ti,": ").concat(a,`px;
   }

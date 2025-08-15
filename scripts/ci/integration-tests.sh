@@ -44,14 +44,14 @@ log_error() {
 
 check_dependencies() {
     log_info "Checking integration test dependencies..."
-    
+
     local missing_deps=()
-    
+
     # Check Python
     if ! command -v python3 &> /dev/null; then
         missing_deps+=("python3")
     fi
-    
+
     # Check required Python packages
     local python_packages=("pytest" "requests" "psycopg2" "redis")
     for package in "${python_packages[@]}"; do
@@ -59,35 +59,35 @@ check_dependencies() {
             missing_deps+=("python3-$package")
         fi
     done
-    
+
     # Check database clients
     if ! command -v psql &> /dev/null; then
         missing_deps+=("postgresql-client")
     fi
-    
+
     if ! command -v redis-cli &> /dev/null; then
         missing_deps+=("redis-tools")
     fi
-    
+
     # Check curl for API tests
     if ! command -v curl &> /dev/null; then
         missing_deps+=("curl")
     fi
-    
+
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
         log_error "Missing dependencies: ${missing_deps[*]}"
         log_info "Install with: apt-get install postgresql-client redis-tools curl && pip install pytest requests psycopg2-binary redis"
         exit 1
     fi
-    
+
     log_success "All dependencies found"
 }
 
 setup_test_environment() {
     log_info "Setting up integration test environment..."
-    
+
     cd "$PROJECT_ROOT"
-    
+
     # Create integration test configuration
     cat > .env.integration << EOF
 # Integration Test Configuration
@@ -124,13 +124,13 @@ EOF
 
     # Copy integration config to main .env
     cp .env.integration .env
-    
+
     log_success "Test environment configured"
 }
 
 wait_for_services() {
     log_info "Waiting for services to be ready..."
-    
+
     # Wait for PostgreSQL
     local postgres_ready=false
     local attempts=0
@@ -144,12 +144,12 @@ wait_for_services() {
             attempts=$((attempts + 1))
         fi
     done
-    
+
     if [[ "$postgres_ready" == "false" ]]; then
         log_error "PostgreSQL failed to become ready"
         exit 1
     fi
-    
+
     # Wait for Redis
     local redis_ready=false
     attempts=0
@@ -163,7 +163,7 @@ wait_for_services() {
             attempts=$((attempts + 1))
         fi
     done
-    
+
     if [[ "$redis_ready" == "false" ]]; then
         log_error "Redis failed to become ready"
         exit 1
@@ -172,13 +172,13 @@ wait_for_services() {
 
 initialize_databases() {
     log_info "Initializing test databases..."
-    
+
     # Create test database if it doesn't exist
     PGPASSWORD="$POSTGRES_PASSWORD" createdb -h "$POSTGRES_HOST" -U "$POSTGRES_USER" "$POSTGRES_DB" 2>/dev/null || true
-    
+
     # Initialize extensions
     PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS vector;" || true
-    
+
     # Clean test database
     PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
     DROP SCHEMA IF EXISTS public CASCADE;
@@ -186,30 +186,30 @@ initialize_databases() {
     GRANT ALL ON SCHEMA public TO $POSTGRES_USER;
     GRANT ALL ON SCHEMA public TO public;
     " || true
-    
+
     # Clean Redis
     redis-cli -u "$REDIS_URL" flushall >/dev/null
-    
+
     # Clean working directory
     rm -rf ./test_integration_storage
-    
+
     log_success "Databases initialized"
 }
 
 start_api_server() {
     log_info "Starting LightRAG API server for integration tests..."
-    
+
     # Kill any existing server
     pkill -f "lightrag.api.lightrag_server" || true
     sleep 2
-    
+
     # Start server in background
     python -m lightrag.api.lightrag_server &
     API_PID=$!
     echo $API_PID > api_integration.pid
-    
+
     log_info "API server started with PID: $API_PID"
-    
+
     # Wait for server to be ready
     local server_ready=false
     local attempts=0
@@ -223,7 +223,7 @@ start_api_server() {
             attempts=$((attempts + 1))
         fi
     done
-    
+
     if [[ "$server_ready" == "false" ]]; then
         log_error "API server failed to start"
         stop_api_server
@@ -233,7 +233,7 @@ start_api_server() {
 
 stop_api_server() {
     log_info "Stopping API server..."
-    
+
     if [[ -f api_integration.pid ]]; then
         local pid=$(cat api_integration.pid)
         if kill -0 "$pid" 2>/dev/null; then
@@ -245,37 +245,37 @@ stop_api_server() {
         fi
         rm -f api_integration.pid
     fi
-    
+
     # Fallback: kill by process name
     pkill -f "lightrag.api.lightrag_server" || true
-    
+
     log_success "API server stopped"
 }
 
 run_api_integration_tests() {
     log_info "Running API integration tests..."
-    
+
     # Test basic health endpoints
     log_info "Testing health endpoints..."
-    
+
     # Basic health check
     if ! curl -f "http://localhost:$API_PORT/health"; then
         log_error "Basic health check failed"
         return 1
     fi
-    
+
     # Detailed health check
     if ! curl -f "http://localhost:$API_PORT/api/health"; then
         log_error "Detailed health check failed"
         return 1
     fi
-    
+
     log_success "Health endpoints working"
-    
+
     # Test document operations (if OpenAI key available)
     if [[ -n "${OPENAI_API_KEY:-}" ]]; then
         log_info "Testing document operations..."
-        
+
         # Insert test document
         local response=$(curl -s -X POST "http://localhost:$API_PORT/documents/insert" \
             -H "Content-Type: application/json" \
@@ -283,13 +283,13 @@ run_api_integration_tests() {
                 "text": "LightRAG is a Python library for retrieval-augmented generation that combines knowledge graphs with vector databases for enhanced document processing.",
                 "description": "Test document for integration testing"
             }')
-        
+
         if echo "$response" | jq -e '.status == "success"' >/dev/null 2>&1; then
             log_success "Document insertion successful"
         else
             log_warning "Document insertion failed (may be due to LLM availability)"
         fi
-        
+
         # Test query
         local query_response=$(curl -s -X POST "http://localhost:$API_PORT/query" \
             -H "Content-Type: application/json" \
@@ -297,7 +297,7 @@ run_api_integration_tests() {
                 "query": "What is LightRAG?",
                 "mode": "naive"
             }')
-        
+
         if echo "$query_response" | jq -e '.response' >/dev/null 2>&1; then
             log_success "Query test successful"
         else
@@ -306,16 +306,16 @@ run_api_integration_tests() {
     else
         log_warning "Skipping LLM-dependent tests (no OPENAI_API_KEY)"
     fi
-    
+
     log_success "API integration tests completed"
 }
 
 run_database_integration_tests() {
     log_info "Running database integration tests..."
-    
+
     # Test PostgreSQL connection and operations
     log_info "Testing PostgreSQL integration..."
-    
+
     # Test basic connection
     if PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT version();" >/dev/null; then
         log_success "PostgreSQL connection successful"
@@ -323,7 +323,7 @@ run_database_integration_tests() {
         log_error "PostgreSQL connection failed"
         return 1
     fi
-    
+
     # Test vector extension
     if PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT '[1,2,3]'::vector(3) <-> '[4,5,6]'::vector(3);" >/dev/null; then
         log_success "PostgreSQL vector operations working"
@@ -331,10 +331,10 @@ run_database_integration_tests() {
         log_error "PostgreSQL vector operations failed"
         return 1
     fi
-    
+
     # Test Redis connection and operations
     log_info "Testing Redis integration..."
-    
+
     # Test basic operations
     if redis-cli -u "$REDIS_URL" set test_key test_value >/dev/null && \
        [[ "$(redis-cli -u "$REDIS_URL" get test_key)" == "test_value" ]]; then
@@ -344,13 +344,13 @@ run_database_integration_tests() {
         log_error "Redis operations failed"
         return 1
     fi
-    
+
     log_success "Database integration tests completed"
 }
 
 run_storage_backend_tests() {
     log_info "Running storage backend integration tests..."
-    
+
     # Run pytest with storage-specific markers
     python -m pytest tests/ \
         -m "storage and integration" \
@@ -358,9 +358,9 @@ run_storage_backend_tests() {
         --tb=short \
         --junit-xml=integration-storage-results.xml \
         --cov-report=xml:integration-storage-coverage.xml
-    
+
     local storage_exit_code=$?
-    
+
     if [[ $storage_exit_code -eq 0 ]]; then
         log_success "Storage backend tests passed"
     else
@@ -371,16 +371,16 @@ run_storage_backend_tests() {
 
 run_end_to_end_tests() {
     log_info "Running end-to-end integration tests..."
-    
+
     # Run pytest with integration markers
     python -m pytest tests/integration/ \
         -v \
         --tb=short \
         --junit-xml=integration-e2e-results.xml \
         --cov-report=xml:integration-e2e-coverage.xml
-    
+
     local e2e_exit_code=$?
-    
+
     if [[ $e2e_exit_code -eq 0 ]]; then
         log_success "End-to-end tests passed"
     else
@@ -391,15 +391,15 @@ run_end_to_end_tests() {
 
 run_docker_integration_tests() {
     log_info "Running Docker integration tests..."
-    
+
     if ! command -v docker &> /dev/null; then
         log_warning "Docker not available - skipping Docker integration tests"
         return 0
     fi
-    
+
     # Test Docker Compose setup
     log_info "Testing Docker Compose integration..."
-    
+
     # Use test compose file
     cat > docker-compose.integration.yml << EOF
 version: '3.8'
@@ -442,10 +442,10 @@ EOF
 
     # Start services
     docker-compose -f docker-compose.integration.yml up -d --wait
-    
+
     # Wait for services to be ready
     sleep 30
-    
+
     # Test health endpoint
     local docker_health_check=false
     local attempts=0
@@ -459,12 +459,12 @@ EOF
             attempts=$((attempts + 1))
         fi
     done
-    
+
     # Cleanup
     docker-compose -f docker-compose.integration.yml down -v
     rm -f docker-compose.integration.yml
     rm -rf test_docker_storage
-    
+
     if [[ "$docker_health_check" == "true" ]]; then
         log_success "Docker integration tests passed"
         return 0
@@ -476,16 +476,16 @@ EOF
 
 run_performance_baseline() {
     log_info "Running performance baseline tests..."
-    
+
     if [[ -f "tests/production/test_performance.py" ]]; then
         # Run performance tests with benchmark
         python -m pytest tests/production/test_performance.py \
             --benchmark-only \
             --benchmark-json=integration-performance.json \
             -v
-        
+
         local perf_exit_code=$?
-        
+
         if [[ $perf_exit_code -eq 0 ]]; then
             log_success "Performance baseline tests passed"
         else
@@ -498,7 +498,7 @@ run_performance_baseline() {
 
 generate_integration_report() {
     log_info "Generating integration test report..."
-    
+
     cat > integration-test-report.md << EOF
 # Integration Test Report
 
@@ -575,24 +575,24 @@ EOF
 
 cleanup() {
     log_info "Cleaning up integration test environment..."
-    
+
     # Stop API server
     stop_api_server
-    
+
     # Clean test data
     rm -rf ./test_integration_storage
     rm -f .env.integration
-    
+
     # Clean databases (optional)
     if [[ "${CLEAN_DATABASES:-true}" == "true" ]]; then
         PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
         DROP SCHEMA IF EXISTS public CASCADE;
         CREATE SCHEMA public;
         " 2>/dev/null || true
-        
+
         redis-cli -u "$REDIS_URL" flushall >/dev/null 2>&1 || true
     fi
-    
+
     log_success "Cleanup completed"
 }
 
@@ -600,49 +600,49 @@ main() {
     log_info "Starting integration tests..."
     log_info "Project root: $PROJECT_ROOT"
     log_info "Test environment: $TEST_ENV"
-    
+
     # Setup trap for cleanup
     trap cleanup EXIT
-    
+
     check_dependencies
     setup_test_environment
     wait_for_services
     initialize_databases
-    
+
     # Start API server for API tests
     start_api_server
-    
+
     local failed_tests=()
-    
+
     # Run test suites
     if ! run_api_integration_tests; then
         failed_tests+=("api")
     fi
-    
+
     if ! run_database_integration_tests; then
         failed_tests+=("database")
     fi
-    
+
     if ! run_storage_backend_tests; then
         failed_tests+=("storage")
     fi
-    
+
     if ! run_end_to_end_tests; then
         failed_tests+=("e2e")
     fi
-    
+
     # Stop API server before Docker tests
     stop_api_server
-    
+
     if ! run_docker_integration_tests; then
         failed_tests+=("docker")
     fi
-    
+
     # Performance tests (non-blocking)
     run_performance_baseline || true
-    
+
     generate_integration_report
-    
+
     # Final result
     if [[ ${#failed_tests[@]} -eq 0 ]]; then
         log_success "All integration tests passed"

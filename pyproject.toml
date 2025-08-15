@@ -84,7 +84,7 @@ test = [
     "pytest-cov",
     "pytest-mock",
     "scikit-learn",
-    "scipy", 
+    "scipy",
     "faiss-cpu",
     "networkx",
     # Document processing dependencies
@@ -96,7 +96,7 @@ test = [
     "pyuca",
     "nano-vectordb",
     "python-dotenv",
-    # API testing dependencies  
+    # API testing dependencies
     "pyjwt",
     "uvicorn",
     "aiofiles",

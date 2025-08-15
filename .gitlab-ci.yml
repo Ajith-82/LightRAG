@@ -11,7 +11,7 @@ variables:
   POSTGRES_DB: "lightrag_test"
   REDIS_URL: "redis://redis:6379"
   COVERAGE_THRESHOLD: "70"
-  
+
   # Docker variables
   DOCKER_DRIVER: overlay2
   DOCKER_TLS_CERTDIR: "/certs"
@@ -52,23 +52,23 @@ lint-and-format:
     - pip install ruff black isort mypy bandit safety
     - pip install -e ".[test]"
     - echo "🔍 Running code quality checks..."
-    
+
     # Linting
     - ruff check lightrag/ lightrag_mcp/ tests/ --output-format=gitlab
-    
+
     # Format checking
     - ruff format --check lightrag/ lightrag_mcp/ tests/
-    
+
     # Import sorting
     - isort --check-only --diff lightrag/ lightrag_mcp/ tests/
-    
+
     # Type checking (non-blocking)
     - mypy lightrag/ --ignore-missing-imports --no-strict-optional || true
-    
+
     # Security checks
     - bandit -r lightrag/ -f json -o bandit-report.json || true
     - safety check --json --output safety-report.json || true
-    
+
     - echo "✅ Code quality checks completed"
   artifacts:
     when: always
@@ -86,21 +86,21 @@ validate-config:
   stage: validate
   script:
     - echo "🔧 Validating configuration files..."
-    
+
     # Validate Docker files
     - |
       if command -v docker &> /dev/null; then
         docker run --rm -i hadolint/hadolint:latest < Dockerfile || true
         docker run --rm -i hadolint/hadolint:latest < Dockerfile.production || true
       fi
-    
+
     # Validate YAML files
     - pip install yamllint
     - find . -name "*.yml" -o -name "*.yaml" | xargs yamllint -d relaxed || true
-    
+
     # Validate pyproject.toml
     - python -c "import tomllib; tomllib.load(open('pyproject.toml', 'rb'))"
-    
+
     - echo "✅ Configuration validation completed"
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -118,13 +118,13 @@ build-python:
     - pip install build twine wheel
     - python -m build
     - python -m twine check dist/*
-    
+
     # Test package installation
     - python -m venv test_env
     - source test_env/bin/activate
     - pip install dist/*.whl
     - python -c "import lightrag; print(f'LightRAG version: {lightrag.__version__}')"
-    
+
     - echo "✅ Python package built successfully"
   artifacts:
     paths:
@@ -146,7 +146,7 @@ build-frontend:
     - npm ci
   script:
     - echo "🏗️ Building frontend..."
-    
+
     # Install Bun if available, fallback to npm
     - |
       if command -v bun &> /dev/null; then
@@ -154,7 +154,7 @@ build-frontend:
       else
         npm run build-no-bun
       fi
-    
+
     # Lint frontend
     - |
       if command -v bun &> /dev/null; then
@@ -162,10 +162,10 @@ build-frontend:
       else
         npm run lint || true
       fi
-    
+
     # Type check
     - npx tsc --noEmit
-    
+
     - echo "✅ Frontend built successfully"
   artifacts:
     paths:
@@ -187,15 +187,15 @@ build-docker:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
     - echo "🐳 Building Docker images..."
-    
+
     # Build development image
     - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA .
     - docker build -t $CI_REGISTRY_IMAGE:production-$CI_COMMIT_SHA -f Dockerfile.production .
-    
+
     # Push images
     - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
     - docker push $CI_REGISTRY_IMAGE:production-$CI_COMMIT_SHA
-    
+
     # Tag latest on default branch
     - |
       if [[ "$CI_COMMIT_BRANCH" == "$CI_DEFAULT_BRANCH" ]]; then
@@ -204,7 +204,7 @@ build-docker:
         docker push $CI_REGISTRY_IMAGE:latest
         docker push $CI_REGISTRY_IMAGE:production-latest
       fi
-    
+
     - echo "✅ Docker images built and pushed"
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -236,7 +236,7 @@ build-docker:
     - apt-get update -qq && apt-get install -y -qq postgresql-client redis-tools
     - python -m pip install --upgrade pip
     - pip install -e ".[test,api]"
-    
+
     # Set up test environment
     - cp env.example .env
     - echo "POSTGRES_HOST=postgres" >> .env
@@ -246,7 +246,7 @@ build-docker:
     - echo "POSTGRES_DB=$POSTGRES_DB" >> .env
     - echo "REDIS_URL=redis://redis:6379" >> .env
     - echo "NODE_ENV=test" >> .env
-    
+
     # Wait for services
     - |
       until pg_isready -h postgres -p 5432 -U $POSTGRES_USER; do
@@ -258,7 +258,7 @@ build-docker:
         echo "Waiting for Redis..."
         sleep 2
       done
-    
+
     # Initialize databases
     - PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -d $POSTGRES_DB -c "CREATE EXTENSION IF NOT EXISTS vector;"
     - redis-cli -h redis -p 6379 flushall
@@ -391,7 +391,7 @@ test-docker:
     - build-docker
   script:
     - echo "🐳 Testing Docker integration..."
-    
+
     # Test development compose
     - docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
     - |
@@ -399,18 +399,18 @@ test-docker:
       NODE_ENV=test
       DEBUG=false
       EOF
-    
+
     # Create modified compose file
     - sed "s|lightrag:latest|$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA|g" docker-compose.yml > docker-compose.test.yml
     - docker-compose -f docker-compose.test.yml up -d --wait
     - sleep 30
-    
+
     # Health checks
     - curl -f http://localhost:9621/health || exit 1
-    
+
     # Cleanup
     - docker-compose -f docker-compose.test.yml down
-    
+
     - echo "✅ Docker integration tests passed"
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -429,15 +429,15 @@ coverage-analysis:
   script:
     - pip install coverage[toml]
     - echo "📊 Analyzing test coverage..."
-    
+
     # Combine all coverage reports
     - coverage combine coverage-*.xml || true
     - coverage report --show-missing
     - coverage html
-    
+
     # Check coverage threshold
     - coverage report --fail-under=$COVERAGE_THRESHOLD
-    
+
     - echo "✅ Coverage analysis completed"
   coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
   artifacts:
@@ -456,13 +456,13 @@ security-scan:
   image: aquasec/trivy:latest
   script:
     - echo "🔒 Running security scans..."
-    
+
     # Filesystem scan
     - trivy fs --format template --template "@contrib/gitlab.tpl" -o trivy-fs-report.json .
-    
+
     # Config scan
     - trivy config --format template --template "@contrib/gitlab.tpl" -o trivy-config-report.json .
-    
+
     - echo "✅ Security scans completed"
   artifacts:
     reports:
@@ -478,13 +478,13 @@ dependency-scan:
   script:
     - pip install safety pip-audit
     - echo "🔍 Scanning dependencies for vulnerabilities..."
-    
+
     # Safety scan
     - safety check --json --output safety-report.json || true
-    
+
     # pip-audit scan
     - pip-audit --format=json --output=pip-audit-report.json || true
-    
+
     - echo "✅ Dependency scan completed"
   artifacts:
     reports:
@@ -519,7 +519,7 @@ deploy-staging:
     - apk add --no-cache curl bash
   script:
     - echo "🚀 Deploying to staging..."
-    
+
     # Deploy using deployment script
     - chmod +x scripts/deploy/deploy-docker.sh
     - export ENVIRONMENT=staging
@@ -527,11 +527,11 @@ deploy-staging:
     - export REGISTRY=$CI_REGISTRY
     - export IMAGE_NAME=$CI_PROJECT_PATH
     - scripts/deploy/deploy-docker.sh
-    
+
     # Health check
     - sleep 30
     - curl -f $CI_ENVIRONMENT_URL/health || exit 1
-    
+
     - echo "✅ Staging deployment completed"
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -549,7 +549,7 @@ deploy-production:
     - apk add --no-cache curl bash
   script:
     - echo "🚀 Deploying to production..."
-    
+
     # Deploy using deployment script
     - chmod +x scripts/deploy/deploy-docker.sh
     - export ENVIRONMENT=production
@@ -557,12 +557,12 @@ deploy-production:
     - export REGISTRY=$CI_REGISTRY
     - export IMAGE_NAME=$CI_PROJECT_PATH
     - scripts/deploy/deploy-docker.sh
-    
+
     # Health check
     - sleep 60
     - curl -f $CI_ENVIRONMENT_URL/health || exit 1
     - curl -f $CI_ENVIRONMENT_URL/api/health || exit 1
-    
+
     - echo "✅ Production deployment completed"
   rules:
     - if: $CI_COMMIT_TAG
@@ -579,10 +579,10 @@ deploy-k8s:
     name: kubernetes
   script:
     - echo "☸️ Deploying to Kubernetes..."
-    
+
     # Configure kubectl
     - echo "$KUBECONFIG_CONTENT" | base64 -d > ~/.kube/config
-    
+
     # Deploy using K8s script
     - chmod +x scripts/deploy/deploy-k8s.sh
     - export ENVIRONMENT=production
@@ -591,10 +591,10 @@ deploy-k8s:
     - export IMAGE_NAME=$CI_PROJECT_PATH
     - export NAMESPACE=lightrag-production
     - scripts/deploy/deploy-k8s.sh
-    
+
     # Verify deployment
     - kubectl rollout status deployment/lightrag -n lightrag-production --timeout=300s
-    
+
     - echo "✅ Kubernetes deployment completed"
   rules:
     - if: $CI_COMMIT_TAG
@@ -655,15 +655,15 @@ release:
     name: 'LightRAG $CI_COMMIT_TAG'
     description: |
       Release $CI_COMMIT_TAG of LightRAG
-      
+
       ## Installation
-      
+
       ```bash
       pip install lightrag-hku==${CI_COMMIT_TAG#v}
       ```
-      
+
       ## Docker
-      
+
       ```bash
       docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG
       ```
