@@ -652,7 +652,7 @@ release:
     - echo "🏷️ Creating GitLab release..."
   release:
     tag_name: $CI_COMMIT_TAG
-    name: 'LightRAG $CI_COMMIT_TAG'
+    name: "LightRAG $CI_COMMIT_TAG"
     description: |
       Release $CI_COMMIT_TAG of LightRAG
 
