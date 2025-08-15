@@ -14,13 +14,13 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from lightrag_mcp.tools.query_tools import lightrag_query
 from lightrag_mcp.tools.document_tools import (
     lightrag_insert_text,
     lightrag_list_documents,
 )
+from lightrag_mcp.tools.graph_tools import lightrag_get_graph, lightrag_search_entities
+from lightrag_mcp.tools.query_tools import lightrag_query
 from lightrag_mcp.tools.system_tools import lightrag_health_check
-from lightrag_mcp.tools.graph_tools import lightrag_search_entities, lightrag_get_graph
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

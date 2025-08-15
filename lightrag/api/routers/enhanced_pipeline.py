@@ -4,10 +4,12 @@ Enhanced document processing pipeline with Docling service integration.
 
 from pathlib import Path
 from typing import Tuple
+
 import aiofiles
 
 from lightrag import LightRAG
 from lightrag.utils import logger
+
 from .document_processing import docling_processor
 
 

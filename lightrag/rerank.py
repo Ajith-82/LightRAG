@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import os
+from typing import Any, Callable, Dict, List, Optional
+
 import aiohttp
-from typing import Callable, Any, List, Dict, Optional
 from pydantic import BaseModel, Field
 
 from .utils import logger

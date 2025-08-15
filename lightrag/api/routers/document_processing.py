@@ -3,17 +3,18 @@ Enhanced document processing with Docling service integration.
 """
 
 from pathlib import Path
-from typing import Dict, Any, Tuple
+from typing import Any, Dict, Tuple
 
-from lightrag.utils import logger
 from lightrag.docling_client import (
     DoclingClient,
-    DoclingServiceUnavailable,
-    DoclingServiceTimeout,
     DoclingProcessingError,
+    DoclingServiceTimeout,
+    DoclingServiceUnavailable,
 )
 from lightrag.docling_client.fallback import fallback_processor
 from lightrag.docling_client.service_discovery import service_discovery
+from lightrag.utils import logger
+
 from ..config import global_args
 
 

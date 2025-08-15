@@ -5,10 +5,10 @@ Handles environment variables, configuration validation,
 and default settings for the MCP server.
 """
 
-import os
 import logging
-from typing import Optional, Dict, List, Any
+import os
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

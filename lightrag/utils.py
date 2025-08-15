@@ -1,29 +1,31 @@
 from __future__ import annotations
-import weakref
 
 import asyncio
-import html
 import csv
+import html
 import json
 import logging
 import logging.handlers
 import os
 import re
 import uuid
+import weakref
 from dataclasses import dataclass
 from datetime import datetime
 from functools import wraps
 from hashlib import md5
-from typing import Any, Protocol, Callable, TYPE_CHECKING, List
+from typing import TYPE_CHECKING, Any, Callable, List, Protocol
+
 import numpy as np
 from dotenv import load_dotenv
+
 from lightrag.constants import (
-    DEFAULT_LOG_MAX_BYTES,
     DEFAULT_LOG_BACKUP_COUNT,
     DEFAULT_LOG_FILENAME,
-    GRAPH_FIELD_SEP,
-    DEFAULT_MAX_TOTAL_TOKENS,
+    DEFAULT_LOG_MAX_BYTES,
     DEFAULT_MAX_FILE_PATH_LENGTH,
+    DEFAULT_MAX_TOTAL_TOKENS,
+    GRAPH_FIELD_SEP,
 )
 
 

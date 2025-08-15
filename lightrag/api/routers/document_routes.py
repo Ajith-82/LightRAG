@@ -3,15 +3,16 @@ This module contains all document-related routes for the LightRAG API.
 """
 
 import asyncio
-from pyuca import Collator
-from lightrag.utils import logger
-import aiofiles
+import hashlib
+import json
 import shutil
 import traceback
-import pipmaster as pm
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Literal
+from typing import Any, Dict, List, Literal, Optional
+
+import aiofiles
+import pipmaster as pm
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -21,13 +22,13 @@ from fastapi import (
     UploadFile,
 )
 from pydantic import BaseModel, Field, field_validator
-import hashlib
-import json
+from pyuca import Collator
 
 from lightrag import LightRAG
-from lightrag.base import DeletionResult, DocProcessingStatus, DocStatus
-from lightrag.utils import generate_track_id
 from lightrag.api.utils_api import get_combined_auth_dependency
+from lightrag.base import DeletionResult, DocProcessingStatus, DocStatus
+from lightrag.utils import generate_track_id, logger
+
 from ..config import global_args
 
 
@@ -46,9 +47,9 @@ async def _process_with_enhanced_docling(file_path: Path) -> str:
         pm.install("docling")
 
     try:
-        from docling.document_converter import DocumentConverter  # type: ignore
         from docling.datamodel.base_models import ConversionStatus  # type: ignore
         from docling.datamodel.document import ConversionResult  # type: ignore
+        from docling.document_converter import DocumentConverter  # type: ignore
 
         # Check cache if enabled
         cache_dir = None
@@ -900,8 +901,9 @@ async def pipeline_enqueue_file(
             else:
                 if not pm.is_installed("pypdf2"):  # type: ignore
                     pm.install("pypdf2")
-                from PyPDF2 import PdfReader  # type: ignore
                 from io import BytesIO
+
+                from PyPDF2 import PdfReader  # type: ignore
 
                 pdf_file = BytesIO(file)
                 reader = PdfReader(pdf_file)
@@ -916,8 +918,9 @@ async def pipeline_enqueue_file(
                         pm.install("python-docx")
                     except Exception:
                         pm.install("docx")
-                from docx import Document  # type: ignore
                 from io import BytesIO
+
+                from docx import Document  # type: ignore
 
                 docx_file = BytesIO(file)
                 doc = Document(docx_file)
@@ -928,8 +931,9 @@ async def pipeline_enqueue_file(
             else:
                 if not pm.is_installed("python-pptx"):  # type: ignore
                     pm.install("pptx")
-                from pptx import Presentation  # type: ignore
                 from io import BytesIO
+
+                from pptx import Presentation  # type: ignore
 
                 pptx_file = BytesIO(file)
                 prs = Presentation(pptx_file)
@@ -943,8 +947,9 @@ async def pipeline_enqueue_file(
             else:
                 if not pm.is_installed("openpyxl"):  # type: ignore
                     pm.install("openpyxl")
-                from openpyxl import load_workbook  # type: ignore
                 from io import BytesIO
+
+                from openpyxl import load_workbook  # type: ignore
 
                 xlsx_file = BytesIO(file)
                 wb = load_workbook(xlsx_file)
@@ -1653,8 +1658,8 @@ def create_document_routes(
         """
         try:
             from lightrag.kg.shared_storage import (
-                get_namespace_data,
                 get_all_update_flags_status,
+                get_namespace_data,
             )
 
             pipeline_status = await get_namespace_data("pipeline_status")

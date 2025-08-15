@@ -2,21 +2,23 @@
 Utility functions for the LightRAG API.
 """
 
-import os
 import argparse
-from typing import Optional
+import os
 import sys
+from typing import Optional
+
 from ascii_colors import ASCIIColors
-from lightrag.api import __api_version__ as api_version
-from lightrag import __version__ as core_version
-from lightrag.constants import (
-    DEFAULT_FORCE_LLM_SUMMARY_ON_MERGE,
-)
-from fastapi import HTTPException, Security, Request, status
+from fastapi import HTTPException, Request, Security, status
 from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
 from starlette.status import HTTP_403_FORBIDDEN
 
-from lightrag.api.config import ollama_server_infos, get_env_value
+from lightrag import __version__ as core_version
+from lightrag.api import __api_version__ as api_version
+from lightrag.api.config import get_env_value, ollama_server_infos
+from lightrag.constants import (
+    DEFAULT_FORCE_LLM_SUMMARY_ON_MERGE,
+)
+
 # Auth handler imported when needed
 
 

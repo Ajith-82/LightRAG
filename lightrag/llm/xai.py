@@ -1,7 +1,8 @@
-from ..utils import verbose_debug, VERBOSE_DEBUG
-import sys
-import os
 import logging
+import os
+import sys
+
+from ..utils import VERBOSE_DEBUG, verbose_debug
 
 if sys.version_info < (3, 9):
     from typing import AsyncIterator
@@ -14,28 +15,28 @@ import pipmaster as pm  # Pipmaster for dynamic library install
 if not pm.is_installed("openai"):
     pm.install("openai")
 
+from typing import Any
+
+import numpy as np
+from dotenv import load_dotenv
 from openai import (
-    AsyncOpenAI,
     APIConnectionError,
-    RateLimitError,
     APITimeoutError,
+    AsyncOpenAI,
+    RateLimitError,
 )
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
 )
-from lightrag.utils import (
-    wrap_embedding_func_with_attrs,
-    logger,
-)
+
 from lightrag.api import __api_version__
-
-import numpy as np
-from typing import Any
-
-from dotenv import load_dotenv
+from lightrag.utils import (
+    logger,
+    wrap_embedding_func_with_attrs,
+)
 
 # use the .env that is inside the current folder
 # allows to use different .env file for each lightrag instance

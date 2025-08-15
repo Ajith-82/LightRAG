@@ -6,13 +6,13 @@ from unittest.mock import patch
 import pytest
 
 from lightrag.api.config import (
-    get_ollama_host,
     get_default_host,
-    parse_args,
-    update_uvicorn_mode_config,
+    get_env_value,
+    get_ollama_host,
     global_args,
     ollama_server_infos,
-    get_env_value,
+    parse_args,
+    update_uvicorn_mode_config,
 )
 
 

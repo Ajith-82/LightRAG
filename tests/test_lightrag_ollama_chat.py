@@ -9,14 +9,15 @@ This script tests the LightRAG's Ollama compatibility interface, including:
 All responses use the JSON Lines format, complying with the Ollama API specification.
 """
 
+import argparse
+import json
+import time
+from enum import Enum, auto
+from pathlib import Path
+from typing import Any, Callable, Dict, List
+
 import pytest
 import requests
-import json
-import argparse
-import time
-from typing import Dict, Any, List, Callable
-from pathlib import Path
-from enum import Enum, auto
 
 
 class ErrorCode(Enum):
@@ -590,8 +591,9 @@ def test_generate_error_handling() -> None:
 def test_generate_concurrent() -> None:
     """Test concurrent generate requests"""
     import asyncio
-    import aiohttp
     from contextlib import asynccontextmanager
+
+    import aiohttp
 
     @asynccontextmanager
     async def get_session():

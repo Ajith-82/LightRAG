@@ -7,8 +7,10 @@ document processing functions in document_routes.py.
 
 from pathlib import Path
 from typing import Tuple
+
 from lightrag import LightRAG
-from lightrag.utils import logger, get_env_value
+from lightrag.utils import get_env_value, logger
+
 from .enhanced_pipeline import enhanced_pipeline_process_any_file
 
 
@@ -87,6 +89,7 @@ async def get_docling_service_info() -> dict:
     """Get information about Docling service integration."""
 
     from lightrag.docling_client.service_discovery import service_discovery
+
     from .document_processing import docling_processor
 
     try:

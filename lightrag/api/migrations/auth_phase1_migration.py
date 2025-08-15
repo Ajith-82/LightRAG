@@ -8,8 +8,8 @@ This script implements the database changes required for:
 - Audit logging tables
 """
 
-import sys
 import logging
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 

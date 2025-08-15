@@ -1,15 +1,17 @@
 import asyncio
-import os
-from typing import Any, final, List, Optional
-from dataclasses import dataclass
-import numpy as np
-import hashlib
-import uuid
-from ..utils import logger
-from ..base import BaseVectorStorage
-from .shared_storage import get_storage_lock
 import configparser
+import hashlib
+import os
+import uuid
+from dataclasses import dataclass
+from typing import Any, List, Optional, final
+
+import numpy as np
 import pipmaster as pm
+
+from ..base import BaseVectorStorage
+from ..utils import logger
+from .shared_storage import get_storage_lock
 
 if not pm.is_installed("qdrant-client"):
     pm.install("qdrant-client")

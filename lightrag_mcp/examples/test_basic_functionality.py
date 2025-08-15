@@ -1,11 +1,13 @@
-import pytest
 import logging
+
+import pytest
+
 from lightrag_mcp.config import get_config
-from lightrag_mcp.tools.query_tools import lightrag_query
 from lightrag_mcp.tools.document_tools import (
     lightrag_insert_text,
     lightrag_list_documents,
 )
+from lightrag_mcp.tools.query_tools import lightrag_query
 from lightrag_mcp.tools.system_tools import lightrag_health_check
 
 # Configure logging

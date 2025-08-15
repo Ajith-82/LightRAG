@@ -5,15 +5,16 @@ Provides secure password hashing, validation, and policy enforcement
 with bcrypt hashing and comprehensive security features.
 """
 
-import bcrypt
-import secrets
-import re
 import hashlib
-from typing import List, Optional, Tuple
-from datetime import datetime, timedelta, timezone
-from dataclasses import dataclass
-from enum import Enum
 import logging
+import re
+import secrets
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from enum import Enum
+from typing import List, Optional, Tuple
+
+import bcrypt
 
 logger = logging.getLogger("lightrag.auth.password")
 

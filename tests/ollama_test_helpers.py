@@ -1,7 +1,7 @@
-from dataclasses import dataclass, asdict
+import json
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import List, Optional
-import json
 
 
 @dataclass

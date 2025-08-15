@@ -15,15 +15,16 @@
 
 import os
 import sys
+
 import numpy as np
-from ascii_colors import ASCIIColors
 import pytest
+from ascii_colors import ASCIIColors
 
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lightrag.types import KnowledgeGraph
 from lightrag.constants import GRAPH_FIELD_SEP
+from lightrag.types import KnowledgeGraph
 
 
 # 模拟的嵌入函数，返回随机向量
