@@ -19,6 +19,8 @@ from typing import Any, Callable, Dict, List
 import pytest
 import requests
 
+from tests.ollama_test_helpers import OllamaTestResult, OllamaTestStats
+
 
 class ErrorCode(Enum):
     """Error codes for MCP errors"""
@@ -72,9 +74,6 @@ class OutputControl:
     @classmethod
     def is_verbose(cls) -> bool:
         return cls._verbose
-
-
-from tests.ollama_test_helpers import OllamaTestResult, OllamaTestStats
 
 
 def make_request(

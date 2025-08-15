@@ -499,20 +499,19 @@ class ClearCacheResponse(BaseModel):
         }
 
 
-"""Response model for document status
-
-Attributes:
-    id: Document identifier
-    content_summary: Summary of document content
-    content_length: Length of document content
-    status: Current processing status
-    created_at: Creation timestamp (ISO format string)
-    updated_at: Last update timestamp (ISO format string)
-    chunks_count: Number of chunks (optional)
-    error: Error message if any (optional)
-    metadata: Additional metadata (optional)
-    file_path: Path to the document file
-"""
+# Response model for document status
+#
+# Attributes:
+#     id: Document identifier
+#     content_summary: Summary of document content
+#     content_length: Length of document content
+#     status: Current processing status
+#     created_at: Creation timestamp (ISO format string)
+#     updated_at: Last update timestamp (ISO format string)
+#     chunks_count: Number of chunks (optional)
+#     error: Error message if any (optional)
+#     metadata: Additional metadata (optional)
+#     file_path: Path to the document file
 
 
 class DeleteDocRequest(BaseModel):

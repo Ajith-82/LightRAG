@@ -231,3 +231,7 @@ directory = "htmlcov"
 
 [tool.coverage.xml]
 output = "coverage.xml"
+
+[tool.bandit]
+exclude_dirs = ["tests", "examples", "docs", "build", "dist"]
+skips = ["B101", "B601"]
