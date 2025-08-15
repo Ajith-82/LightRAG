@@ -614,7 +614,7 @@ notify-success:
     - echo "📢 Sending success notification..."
     - |
       if [[ -n "$SLACK_WEBHOOK_URL" ]]; then
-        curl -X POST -H 'Content-type: application/json' \
+        curl -X POST -H "Content-type: application/json" \
           --data "{\"text\":\"✅ LightRAG pipeline succeeded for $CI_COMMIT_REF_NAME ($CI_COMMIT_SHORT_SHA)\"}" \
           $SLACK_WEBHOOK_URL
       fi
@@ -633,7 +633,7 @@ notify-failure:
     - echo "📢 Sending failure notification..."
     - |
       if [[ -n "$SLACK_WEBHOOK_URL" ]]; then
-        curl -X POST -H 'Content-type: application/json' \
+        curl -X POST -H "Content-type: application/json" \
           --data "{\"text\":\"❌ LightRAG pipeline failed for $CI_COMMIT_REF_NAME ($CI_COMMIT_SHORT_SHA)\"}" \
           $SLACK_WEBHOOK_URL
       fi

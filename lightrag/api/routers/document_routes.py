@@ -71,7 +71,7 @@ async def _process_with_enhanced_docling(file_path: Path) -> str:
             }
             cache_key = hashlib.md5(
                 json.dumps(cache_key_data, sort_keys=True).encode(),
-                usedforsecurity=False
+                usedforsecurity=False,
             ).hexdigest()
             cache_file = cache_dir / f"{cache_key}.json"
 
@@ -1000,7 +1000,9 @@ async def pipeline_enqueue_file(
     return False, ""
 
 
-async def pipeline_index_file(rag: LightRAG, file_path: Path, track_id: Optional[str] = None):
+async def pipeline_index_file(
+    rag: LightRAG, file_path: Path, track_id: Optional[str] = None
+):
     """Index a file with track_id
 
     Args:
