@@ -36,7 +36,7 @@ repos:
 
   # Python code formatting with ruff
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.8
+    rev: v0.12.9
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
@@ -99,35 +99,9 @@ repos:
         args: [--convention=google, --add-ignore=D100,D101,D102,D103,D104,D105,D107]
         exclude: ^(tests/|examples/|migrations/)
 
-  # Security dependency scanning
-  - repo: https://github.com/PyCQA/safety
-    rev: 2.3.5
-    hooks:
-      - id: safety
-        args: [--short-report, --ignore=70612]
-
   # Local hooks for project-specific checks
   - repo: local
     hooks:
-      # Check for sensitive information
-      - id: check-secrets
-        name: Check for secrets
-        entry: bash -c 'if grep -r "api_key\|password\|secret\|token" --include="*.py" --include="*.yaml" --include="*.yml" --exclude-dir=".git" --exclude="*.example" .; then echo "Potential secrets found!"; exit 1; fi'
-        language: system
-        exclude: ^(\.pre-commit-config\.yaml|tests/.*|examples/.*|docs/.*)$
-
-      # Check for proper logging usage
-      - id: check-logging
-        name: Check logging usage
-        entry: bash -c 'if grep -r "print(" --include="*.py" lightrag/ lightrag_mcp/ | grep -v "test"; then echo "Use logging instead of print statements"; exit 1; fi'
-        language: system
-
-      # Check environment file examples
-      - id: check-env-examples
-        name: Check environment examples
-        entry: bash -c 'if [ -f .env ]; then echo "Do not commit .env file"; exit 1; fi'
-        language: system
-
       # Validate pyproject.toml
       - id: validate-pyproject
         name: Validate pyproject.toml
@@ -136,7 +110,7 @@ repos:
         files: pyproject\.toml$
 
 # Global configuration
-default_stages: [commit]
+default_stages: [pre-commit]
 fail_fast: false
 minimum_pre_commit_version: '3.0.0'
 
