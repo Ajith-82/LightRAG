@@ -8,7 +8,7 @@ web vulnerabilities and attacks.
 import logging
 import os
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -274,7 +274,7 @@ class CSPViolationReporter:
 
     def __init__(self, report_endpoint: str = "/security/csp-report"):
         self.report_endpoint = report_endpoint
-        self.violations = []
+        self.violations: list[dict] = []
 
     async def handle_csp_report(self, request: Request) -> Response:
         """Handle CSP violation reports."""
@@ -316,7 +316,7 @@ class SecurityAnalyzer:
     def __init__(self, config: SecurityHeadersConfig):
         self.config = config
 
-    def analyze_security_posture(self) -> Dict[str, any]:
+    def analyze_security_posture(self) -> Dict[str, Any]:
         """Analyze current security configuration."""
         analysis = {
             "score": 0,
