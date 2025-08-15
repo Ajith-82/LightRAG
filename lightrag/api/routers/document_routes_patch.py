@@ -15,7 +15,7 @@ from .enhanced_pipeline import enhanced_pipeline_process_any_file
 
 
 async def enhanced_pipeline_enqueue_file_with_compatibility(
-    rag: LightRAG, file_path: Path, track_id: str = None
+    rag: LightRAG, file_path: Path, track_id: Optional[str] = None
 ) -> Tuple[bool, str]:
     """
     Enhanced version that maintains compatibility with existing code.

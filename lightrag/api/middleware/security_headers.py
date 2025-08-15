@@ -54,7 +54,7 @@ class SecurityHeadersConfig:
     enable_permissions_policy: bool = True
 
     # Custom headers
-    custom_headers: Dict[str, str] = None
+    custom_headers: Optional[Dict[str, str]] = None
 
     # Server header
     hide_server_header: bool = True

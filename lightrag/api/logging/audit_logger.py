@@ -419,9 +419,9 @@ class AuditLogger:
         endpoint: str,
         method: str,
         status_code: int,
-        user_id: str = None,
-        ip_address: str = None,
-        response_time: float = None,
+        user_id: Optional[str] = None,
+        ip_address: Optional[str] = None,
+        response_time: Optional[float] = None,
         **kwargs,
     ):
         """Log API access event."""

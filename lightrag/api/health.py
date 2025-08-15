@@ -39,7 +39,7 @@ class HealthStatus:
     version: str = "1.0.0"
     environment: str = "production"
     uptime_seconds: float = 0.0
-    checks: Dict[str, Any] = None
+    checks: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         if self.checks is None:

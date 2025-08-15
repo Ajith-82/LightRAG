@@ -815,7 +815,7 @@ class DocumentManager:
 
 
 async def pipeline_enqueue_file(
-    rag: LightRAG, file_path: Path, track_id: str = None
+    rag: LightRAG, file_path: Path, track_id: Optional[str] = None
 ) -> tuple[bool, str]:
     """Add a file to the queue for processing
 
@@ -999,7 +999,7 @@ async def pipeline_enqueue_file(
     return False, ""
 
 
-async def pipeline_index_file(rag: LightRAG, file_path: Path, track_id: str = None):
+async def pipeline_index_file(rag: LightRAG, file_path: Path, track_id: Optional[str] = None):
     """Index a file with track_id
 
     Args:
@@ -1020,7 +1020,7 @@ async def pipeline_index_file(rag: LightRAG, file_path: Path, track_id: str = No
 
 
 async def pipeline_index_files(
-    rag: LightRAG, file_paths: List[Path], track_id: str = None
+    rag: LightRAG, file_paths: List[Path], track_id: Optional[str] = None
 ):
     """Index multiple files sequentially to avoid high CPU load
 
@@ -1055,8 +1055,8 @@ async def pipeline_index_files(
 async def pipeline_index_texts(
     rag: LightRAG,
     texts: List[str],
-    file_sources: List[str] = None,
-    track_id: str = None,
+    file_sources: Optional[List[str]] = None,
+    track_id: Optional[str] = None,
 ):
     """Index a list of texts with track_id
 
@@ -1081,7 +1081,7 @@ async def pipeline_index_texts(
 
 
 async def run_scanning_process(
-    rag: LightRAG, doc_manager: DocumentManager, track_id: str = None
+    rag: LightRAG, doc_manager: DocumentManager, track_id: Optional[str] = None
 ):
     """Background task to scan and index documents
 

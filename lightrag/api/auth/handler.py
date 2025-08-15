@@ -37,8 +37,8 @@ class AuthHandler:
         self,
         username: str,
         role: str = "user",
-        custom_expire_hours: int = None,
-        metadata: dict = None,
+        custom_expire_hours: Optional[int] = None,
+        metadata: Optional[dict] = None,
     ) -> str:
         """
         Create JWT token
