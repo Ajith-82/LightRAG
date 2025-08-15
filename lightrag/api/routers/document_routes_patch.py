@@ -6,7 +6,7 @@ document processing functions in document_routes.py.
 """
 
 from pathlib import Path
-from typing import Tuple
+from typing import Optional, Tuple
 
 from lightrag import LightRAG
 from lightrag.utils import get_env_value, logger
