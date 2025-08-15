@@ -198,7 +198,7 @@ class PasswordManager:
             return False
 
     def validate_password(
-        self, password: str, user_id: str = None
+        self, password: str, user_id: Optional[str] = None
     ) -> Tuple[bool, List[str], PasswordStrength]:
         """
         Validate password against policy.

@@ -133,7 +133,7 @@ class AuditEvent:
 
     # Event details
     message: str = ""
-    details: Dict[str, Any] = None
+    details: Optional[Dict[str, Any]] = None
     success: bool = True
     error_message: Optional[str] = None
 
@@ -144,8 +144,8 @@ class AuditEvent:
 
     # Metadata
     correlation_id: Optional[str] = None
-    tags: List[str] = None
-    metadata: Dict[str, Any] = None
+    tags: Optional[List[str]] = None
+    metadata: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         """Post-initialization processing."""
@@ -386,11 +386,11 @@ class AuditLogger:
     async def log_auth_event(
         self,
         event_type: AuditEventType,
-        user_id: str = None,
+        user_id: Optional[str] = None,
         success: bool = True,
-        details: Dict[str, Any] = None,
-        ip_address: str = None,
-        user_agent: str = None,
+        details: Optional[Dict[str, Any]] = None,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
         **kwargs,
     ):
         """Log authentication event."""
@@ -457,7 +457,7 @@ class AuditLogger:
         event_type: AuditEventType,
         severity: AuditSeverity = AuditSeverity.MEDIUM,
         message: str = "",
-        details: Dict[str, Any] = None,
+        details: Optional[Dict[str, Any]] = None,
         **kwargs,
     ):
         """Log security event."""
