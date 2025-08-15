@@ -5,7 +5,7 @@ import re
 import datetime
 from datetime import timezone
 from dataclasses import dataclass, field
-from typing import Any, Union, final
+from typing import Any, Union, Optional, final
 import numpy as np
 import configparser
 import ssl
@@ -57,7 +57,7 @@ class PostgreSQLDB:
         self.workspace = config["workspace"]
         self.max = int(config["max_connections"])
         self.increment = 1
-        self.pool: Pool | None = None
+        self.pool: Optional[Pool] = None
 
         # SSL configuration
         self.ssl_mode = config.get("ssl_mode")
@@ -917,11 +917,11 @@ class PostgreSQLDB:
     async def query(
         self,
         sql: str,
-        params: dict[str, Any] | None = None,
+        params: Optional[dict[str, Any]] = None,
         multirows: bool = False,
         with_age: bool = False,
-        graph_name: str | None = None,
-    ) -> dict[str, Any] | None | list[dict[str, Any]]:
+        graph_name: Optional[str] = None,
+    ) -> Union[dict[str, Any], None, list[dict[str, Any]]]:
         # start_time = time.time()
         # logger.info(f"PostgreSQL, Querying:\n{sql}")
 
@@ -962,11 +962,11 @@ class PostgreSQLDB:
     async def execute(
         self,
         sql: str,
-        data: dict[str, Any] | None = None,
+        data: Optional[dict[str, Any]] = None,
         upsert: bool = False,
         ignore_if_exists: bool = False,
         with_age: bool = False,
-        graph_name: str | None = None,
+        graph_name: Optional[str] = None,
     ):
         try:
             async with self.pool.acquire() as connection:  # type: ignore
@@ -1181,7 +1181,7 @@ class PGKVStorage(BaseKVStorage):
             logger.error(f"Error retrieving all data from {self.namespace}: {e}")
             return {}
 
-    async def get_by_id(self, id: str) -> dict[str, Any] | None:
+    async def get_by_id(self, id: str) -> Optional[dict[str, Any]]:
         """Get data by id."""
         sql = SQL_TEMPLATES["get_by_id_" + self.namespace]
         params = {"workspace": self.db.workspace, "id": id}
@@ -1373,7 +1373,7 @@ class PGKVStorage(BaseKVStorage):
         except Exception as e:
             logger.error(f"Error while deleting records from {self.namespace}: {e}")
 
-    async def drop_cache_by_modes(self, modes: list[str] | None = None) -> bool:
+    async def drop_cache_by_modes(self, modes: Optional[list[str]] = None) -> bool:
         """Delete specific records from storage by cache mode
 
         Args:
@@ -1428,7 +1428,7 @@ class PGKVStorage(BaseKVStorage):
 @final
 @dataclass
 class PGVectorStorage(BaseVectorStorage):
-    db: PostgreSQLDB | None = field(default=None)
+    db: Optional[PostgreSQLDB] = field(default=None)
 
     def __post_init__(self):
         self._max_batch_size = self.global_config["embedding_batch_num"]
@@ -1576,7 +1576,7 @@ class PGVectorStorage(BaseVectorStorage):
 
     #################### query method ###############
     async def query(
-        self, query: str, top_k: int, ids: list[str] | None = None
+        self, query: str, top_k: int, ids: Optional[list[str]] = None
     ) -> list[dict[str, Any]]:
         embeddings = await self.embedding_func(
             [query], _priority=5
@@ -1660,7 +1660,7 @@ class PGVectorStorage(BaseVectorStorage):
         except Exception as e:
             logger.error(f"Error deleting relations for entity {entity_name}: {e}")
 
-    async def get_by_id(self, id: str) -> dict[str, Any] | None:
+    async def get_by_id(self, id: str) -> Optional[dict[str, Any]]:
         """Get vector data by its ID
 
         Args:
@@ -2148,7 +2148,7 @@ class PGGraphQueryException(Exception):
 class PGGraphStorage(BaseGraphStorage):
     def __post_init__(self):
         # Graph name will be dynamically generated in initialize() based on workspace
-        self.db: PostgreSQLDB | None = None
+        self.db: Optional[PostgreSQLDB] = None
 
     def _get_workspace_graph_name(self) -> str:
         """
@@ -2485,7 +2485,7 @@ class PGGraphStorage(BaseGraphStorage):
 
         return single_result["edge_exists"]
 
-    async def get_node(self, node_id: str) -> dict[str, str] | None:
+    async def get_node(self, node_id: str) -> Optional[dict[str, str]]:
         """Get node by its label identifier, return only node properties"""
 
         label = self._normalize_node_id(node_id)
@@ -2562,7 +2562,7 @@ class PGGraphStorage(BaseGraphStorage):
 
             return result
 
-    async def get_node_edges(self, source_node_id: str) -> list[tuple[str, str]] | None:
+    async def get_node_edges(self, source_node_id: str) -> Optional[list[tuple[str, str]]]:
         """
         Retrieves all edges (relationships) for a particular node identified by its label.
         :return: list of dictionaries containing edge information

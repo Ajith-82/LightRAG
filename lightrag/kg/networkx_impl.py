@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass
-from typing import final
+from typing import final, Optional, Union
 
 from lightrag.types import KnowledgeGraph, KnowledgeGraphNode, KnowledgeGraphEdge
 from lightrag.utils import logger
@@ -127,7 +127,7 @@ class NetworkXStorage(BaseGraphStorage):
         graph = await self._get_graph()
         return graph.has_edge(source_node_id, target_node_id)
 
-    async def get_node(self, node_id: str) -> dict[str, str] | None:
+    async def get_node(self, node_id: str) -> Optional[dict[str, str]]:
         graph = await self._get_graph()
         return graph.nodes.get(node_id)
 
@@ -143,11 +143,11 @@ class NetworkXStorage(BaseGraphStorage):
 
     async def get_edge(
         self, source_node_id: str, target_node_id: str
-    ) -> dict[str, str] | None:
+    ) -> Optional[dict[str, str]]:
         graph = await self._get_graph()
         return graph.edges.get((source_node_id, target_node_id))
 
-    async def get_node_edges(self, source_node_id: str) -> list[tuple[str, str]] | None:
+    async def get_node_edges(self, source_node_id: str) -> Optional[list[tuple[str, str]]]:
         graph = await self._get_graph()
         if graph.has_node(source_node_id):
             return list(graph.edges(source_node_id))

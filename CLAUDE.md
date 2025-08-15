@@ -658,3 +658,6 @@ This applies to both code-level comments and documentation in separate files. Co
 - If asked to implement something that won't be accessible to other users/developers in the repository, proactively highlight this issue
 - The goal is complete knowledge sharing between ALL developers (human and AI) without exceptions
 - When suggesting where to store information, recommend appropriate locations based on the type of information (code comments, documentation files, CLAUDE.md, etc.)
+
+- Make a virtual enviornment for all developments.
+- Use agents as much as possible.

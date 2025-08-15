@@ -1,6 +1,6 @@
 import asyncio
 import os
-from typing import Any, final
+from typing import Any, final, Optional, Union
 from dataclasses import dataclass
 import numpy as np
 import time
@@ -157,7 +157,7 @@ class NanoVectorDBStorage(BaseVectorStorage):
             )
 
     async def query(
-        self, query: str, top_k: int, ids: list[str] | None = None
+        self, query: str, top_k: int, ids: Optional[list[str]] = None
     ) -> list[dict[str, Any]]:
         # Execute embedding outside of lock to avoid improve cocurrent
         embedding = await self.embedding_func(
@@ -294,7 +294,7 @@ class NanoVectorDBStorage(BaseVectorStorage):
 
         return True  # Return success
 
-    async def get_by_id(self, id: str) -> dict[str, Any] | None:
+    async def get_by_id(self, id: str) -> Optional[dict[str, Any]]:
         """Get vector data by its ID
 
         Args:

@@ -1,5 +1,5 @@
 import os
-from typing import Any, final, Union
+from typing import Any, final, Union, Optional
 from dataclasses import dataclass
 import pipmaster as pm
 import configparser
@@ -242,7 +242,7 @@ class RedisKVStorage(BaseKVStorage):
         await self.close()
 
     @redis_retry
-    async def get_by_id(self, id: str) -> dict[str, Any] | None:
+    async def get_by_id(self, id: str) -> Optional[dict[str, Any]]:
         async with self._get_redis_connection() as redis:
             try:
                 data = await redis.get(f"{self.namespace}:{id}")
@@ -397,7 +397,7 @@ class RedisKVStorage(BaseKVStorage):
                 f"Deleted {deleted_count} of {len(ids)} entries from {self.namespace}"
             )
 
-    async def drop_cache_by_modes(self, modes: list[str] | None = None) -> bool:
+    async def drop_cache_by_modes(self, modes: Optional[list[str]] = None) -> bool:
         """Delete specific records from storage by cache mode
 
         Importance notes for Redis storage:

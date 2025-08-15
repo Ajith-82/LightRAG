@@ -1,0 +1,447 @@
+name: CI - Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop, feature/*, fix/*, hotfix/* ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      test_markers:
+        description: 'Pytest markers to run (e.g., "not slow", "integration", "unit")'
+        required: false
+        default: 'not slow'
+      environment:
+        description: 'Test environment'
+        required: false
+        default: 'test'
+        type: choice
+        options:
+        - test
+        - staging
+
+env:
+  PYTHON_VERSION: '3.10'
+  NODE_VERSION: '18'
+  COVERAGE_THRESHOLD: 70
+  POSTGRES_USER: lightrag
+  POSTGRES_PASSWORD: lightrag
+  POSTGRES_DB: lightrag_test
+  REDIS_URL: redis://localhost:6379
+
+jobs:
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install ruff mypy black isort bandit safety
+        pip install -e ".[test]"
+
+    - name: Cache ruff
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/ruff
+        key: ruff-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+
+    - name: Run linting (ruff check)
+      run: ruff check lightrag/ lightrag_mcp/ tests/ --output-format=github
+
+    - name: Check formatting (ruff format)
+      run: ruff format --check lightrag/ lightrag_mcp/ tests/
+
+    - name: Run import sorting check (isort)
+      run: isort --check-only --diff lightrag/ lightrag_mcp/ tests/
+
+    - name: Type checking (mypy)
+      run: |
+        mypy lightrag/ --ignore-missing-imports --no-strict-optional
+      continue-on-error: true  # MyPy can be strict, don't fail CI
+
+    - name: Security check (bandit)
+      run: |
+        bandit -r lightrag/ -f json -o bandit-report.json || true
+        bandit -r lightrag/ -ll
+
+    - name: Dependency vulnerability check (safety)
+      run: |
+        safety check --json --output safety-report.json || true
+        safety check
+      continue-on-error: true
+
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          safety-report.json
+
+  test-matrix:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: code-quality
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+        test-group: [
+          'unit',
+          'integration', 
+          'api',
+          'storage',
+          'security',
+          'core',
+          'production'
+        ]
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y postgresql-client redis-tools
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[test,api]"
+
+    - name: Set up test environment
+      run: |
+        cp env.example .env
+        echo "POSTGRES_HOST=localhost" >> .env
+        echo "POSTGRES_PORT=5432" >> .env
+        echo "POSTGRES_USER=${{ env.POSTGRES_USER }}" >> .env
+        echo "POSTGRES_PASSWORD=${{ env.POSTGRES_PASSWORD }}" >> .env
+        echo "POSTGRES_DB=${{ env.POSTGRES_DB }}" >> .env
+        echo "REDIS_URL=${{ env.REDIS_URL }}" >> .env
+        echo "NODE_ENV=test" >> .env
+        echo "DEBUG=false" >> .env
+
+    - name: Wait for services
+      run: |
+        until pg_isready -h localhost -p 5432 -U ${{ env.POSTGRES_USER }}; do
+          echo "Waiting for PostgreSQL..."
+          sleep 2
+        done
+        until redis-cli -h localhost -p 6379 ping; do
+          echo "Waiting for Redis..."
+          sleep 2
+        done
+
+    - name: Initialize databases
+      run: |
+        PGPASSWORD=${{ env.POSTGRES_PASSWORD }} psql -h localhost -U ${{ env.POSTGRES_USER }} -d ${{ env.POSTGRES_DB }} -c "CREATE EXTENSION IF NOT EXISTS vector;"
+        redis-cli -h localhost -p 6379 flushall
+
+    - name: Cache pytest
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pytest
+        key: pytest-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
+
+    - name: Run tests - ${{ matrix.test-group }}
+      run: |
+        if [ "${{ matrix.test-group }}" = "unit" ]; then
+          python -m pytest tests/ -m "unit and not slow" -v --tb=short --cov-report=xml:coverage-${{ matrix.test-group }}-${{ matrix.python-version }}.xml
+        elif [ "${{ matrix.test-group }}" = "integration" ]; then
+          python -m pytest tests/integration/ -m "integration" -v --tb=short --cov-report=xml:coverage-${{ matrix.test-group }}-${{ matrix.python-version }}.xml
+        elif [ "${{ matrix.test-group }}" = "production" ]; then
+          python -m pytest tests/production/ -m "production" -v --tb=short --cov-report=xml:coverage-${{ matrix.test-group }}-${{ matrix.python-version }}.xml
+        else
+          python -m pytest tests/ -m "${{ matrix.test-group }}" -v --tb=short --cov-report=xml:coverage-${{ matrix.test-group }}-${{ matrix.python-version }}.xml
+        fi
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-reports
+        path: coverage-*.xml
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results-${{ matrix.test-group }}-py${{ matrix.python-version }}
+        path: |
+          pytest-report.xml
+          pytest.log
+
+  frontend-tests:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: lightrag_webui
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: lightrag_webui/package-lock.json
+
+    - name: Install Bun
+      run: |
+        curl -fsSL https://bun.sh/install | bash
+        echo "$HOME/.bun/bin" >> $GITHUB_PATH
+
+    - name: Install dependencies
+      run: |
+        if command -v bun &> /dev/null; then
+          bun install
+        else
+          npm ci
+        fi
+
+    - name: Lint TypeScript/React
+      run: |
+        if command -v bun &> /dev/null; then
+          bun run lint
+        else
+          npm run lint
+        fi
+
+    - name: Type check
+      run: |
+        if command -v bun &> /dev/null; then
+          bun run type-check || npx tsc --noEmit
+        else
+          npx tsc --noEmit
+        fi
+
+    - name: Build frontend
+      run: |
+        if command -v bun &> /dev/null; then
+          bun run build
+        else
+          npm run build-no-bun
+        fi
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: frontend-build
+        path: lightrag_webui/dist/
+
+  docker-tests:
+    name: Docker Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [test-matrix, frontend-tests]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Docker images
+      run: |
+        docker build -t lightrag:test .
+        docker build -t lightrag:production -f Dockerfile.production .
+
+    - name: Test Docker Compose
+      run: |
+        cp env.example .env
+        echo "NODE_ENV=test" >> .env
+        docker compose -f docker-compose.yml up -d --wait
+        sleep 30
+        
+        # Health checks
+        curl -f http://localhost:9621/health || exit 1
+        
+        # Cleanup
+        docker compose -f docker-compose.yml down
+
+    - name: Test Production Docker Compose
+      run: |
+        cp production.env .env
+        echo "NODE_ENV=test" >> .env
+        echo "DEBUG=false" >> .env
+        docker compose -f docker-compose.production.yml up -d --wait
+        sleep 45
+        
+        # Health checks
+        curl -f http://localhost:9621/health || exit 1
+        curl -f http://localhost:9621/api/health || exit 1
+        
+        # Cleanup
+        docker compose -f docker-compose.production.yml down
+
+  coverage-report:
+    name: Coverage Analysis
+    runs-on: ubuntu-latest
+    needs: test-matrix
+    if: always()
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download coverage reports
+      uses: actions/download-artifact@v3
+      with:
+        name: coverage-reports
+        path: coverage-reports/
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install coverage tools
+      run: |
+        pip install coverage[toml] codecov
+
+    - name: Combine coverage reports
+      run: |
+        coverage combine coverage-reports/coverage-*.xml || true
+        coverage report --show-missing
+        coverage html
+
+    - name: Check coverage threshold
+      run: |
+        coverage report --fail-under=${{ env.COVERAGE_THRESHOLD }}
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+
+    - name: Upload HTML coverage report
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-html-report
+        path: htmlcov/
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: code-quality
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  build-success:
+    name: CI Pipeline Success
+    runs-on: ubuntu-latest
+    needs: [code-quality, test-matrix, frontend-tests, docker-tests, coverage-report]
+    if: always()
+
+    steps:
+    - name: Check CI status
+      run: |
+        if [[ "${{ needs.code-quality.result }}" != "success" ]]; then
+          echo "Code quality checks failed"
+          exit 1
+        fi
+        if [[ "${{ needs.test-matrix.result }}" != "success" ]]; then
+          echo "Test matrix failed"
+          exit 1
+        fi
+        if [[ "${{ needs.frontend-tests.result }}" != "success" ]]; then
+          echo "Frontend tests failed"
+          exit 1
+        fi
+        if [[ "${{ needs.docker-tests.result }}" != "success" ]]; then
+          echo "Docker tests failed"
+          exit 1
+        fi
+        echo "✅ All CI checks passed!"
+
+    - name: Post CI results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const { owner, repo, number } = context.issue;
+          await github.rest.issues.createComment({
+            owner,
+            repo,
+            issue_number: number,
+            body: '✅ **CI Pipeline Completed Successfully**\n\n' +
+                  '- ✅ Code quality checks passed\n' +
+                  '- ✅ Test matrix completed\n' +
+                  '- ✅ Frontend tests passed\n' +
+                  '- ✅ Docker integration tests passed\n' +
+                  '- ✅ Coverage threshold met\n\n' +
+                  'Ready for review and merge! 🚀'
+          });

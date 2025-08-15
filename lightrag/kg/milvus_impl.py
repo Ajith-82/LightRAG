@@ -1,6 +1,6 @@
 import asyncio
 import os
-from typing import Any, final
+from typing import Any, final, Optional
 from dataclasses import dataclass
 import numpy as np
 from lightrag.utils import logger, compute_mdhash_id
@@ -738,7 +738,7 @@ class MilvusVectorDBStorage(BaseVectorStorage):
         return results
 
     async def query(
-        self, query: str, top_k: int, ids: list[str] | None = None
+        self, query: str, top_k: int, ids: Optional[list[str]] = None
     ) -> list[dict[str, Any]]:
         # Ensure collection is loaded before querying
         self._ensure_collection_loaded()
@@ -864,7 +864,7 @@ class MilvusVectorDBStorage(BaseVectorStorage):
         except Exception as e:
             logger.error(f"Error while deleting vectors from {self.namespace}: {e}")
 
-    async def get_by_id(self, id: str) -> dict[str, Any] | None:
+    async def get_by_id(self, id: str) -> Optional[dict[str, Any]]:
         """Get vector data by its ID
 
         Args:

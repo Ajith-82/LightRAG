@@ -1,6 +1,6 @@
 import asyncio
 import os
-from typing import Any, final, List
+from typing import Any, final, List, Optional
 from dataclasses import dataclass
 import numpy as np
 import hashlib
@@ -168,7 +168,7 @@ class QdrantVectorDBStorage(BaseVectorStorage):
         return results
 
     async def query(
-        self, query: str, top_k: int, ids: list[str] | None = None
+        self, query: str, top_k: int, ids: Optional[list[str]] = None
     ) -> list[dict[str, Any]]:
         embedding = await self.embedding_func(
             [query], _priority=5
@@ -289,7 +289,7 @@ class QdrantVectorDBStorage(BaseVectorStorage):
         except Exception as e:
             logger.error(f"Error deleting relations for {entity_name}: {e}")
 
-    async def get_by_id(self, id: str) -> dict[str, Any] | None:
+    async def get_by_id(self, id: str) -> Optional[dict[str, Any]]:
         """Get vector data by its ID
 
         Args:

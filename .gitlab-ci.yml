@@ -1,0 +1,702 @@
+# GitLab CI/CD Configuration for LightRAG
+# This pipeline provides an alternative to GitHub Actions for teams using GitLab
+
+variables:
+  # Global variables
+  PYTHON_VERSION: "3.10"
+  NODE_VERSION: "18"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  POSTGRES_USER: "lightrag"
+  POSTGRES_PASSWORD: "lightrag"
+  POSTGRES_DB: "lightrag_test"
+  REDIS_URL: "redis://redis:6379"
+  COVERAGE_THRESHOLD: "70"
+  
+  # Docker variables
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+  REGISTRY: $CI_REGISTRY
+  IMAGE_NAME: $CI_PROJECT_PATH
+
+# Define stages
+stages:
+  - validate
+  - build
+  - test
+  - security
+  - deploy
+  - notify
+
+# Cache configuration
+cache:
+  paths:
+    - .cache/pip
+    - node_modules/
+    - .pytest_cache/
+
+# Default configuration
+default:
+  image: python:${PYTHON_VERSION}-slim
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq git curl
+    - python -m pip install --upgrade pip
+
+# ==================== VALIDATION STAGE ====================
+
+lint-and-format:
+  stage: validate
+  cache:
+    paths:
+      - .cache/pip
+  script:
+    - pip install ruff black isort mypy bandit safety
+    - pip install -e ".[test]"
+    - echo "🔍 Running code quality checks..."
+    
+    # Linting
+    - ruff check lightrag/ lightrag_mcp/ tests/ --output-format=gitlab
+    
+    # Format checking
+    - ruff format --check lightrag/ lightrag_mcp/ tests/
+    
+    # Import sorting
+    - isort --check-only --diff lightrag/ lightrag_mcp/ tests/
+    
+    # Type checking (non-blocking)
+    - mypy lightrag/ --ignore-missing-imports --no-strict-optional || true
+    
+    # Security checks
+    - bandit -r lightrag/ -f json -o bandit-report.json || true
+    - safety check --json --output safety-report.json || true
+    
+    - echo "✅ Code quality checks completed"
+  artifacts:
+    when: always
+    reports:
+      junit: ruff-report.xml
+    paths:
+      - bandit-report.json
+      - safety-report.json
+    expire_in: 1 week
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+validate-config:
+  stage: validate
+  script:
+    - echo "🔧 Validating configuration files..."
+    
+    # Validate Docker files
+    - |
+      if command -v docker &> /dev/null; then
+        docker run --rm -i hadolint/hadolint:latest < Dockerfile || true
+        docker run --rm -i hadolint/hadolint:latest < Dockerfile.production || true
+      fi
+    
+    # Validate YAML files
+    - pip install yamllint
+    - find . -name "*.yml" -o -name "*.yaml" | xargs yamllint -d relaxed || true
+    
+    # Validate pyproject.toml
+    - python -c "import tomllib; tomllib.load(open('pyproject.toml', 'rb'))"
+    
+    - echo "✅ Configuration validation completed"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# ==================== BUILD STAGE ====================
+
+build-python:
+  stage: build
+  cache:
+    paths:
+      - .cache/pip
+  script:
+    - echo "🏗️ Building Python package..."
+    - pip install build twine wheel
+    - python -m build
+    - python -m twine check dist/*
+    
+    # Test package installation
+    - python -m venv test_env
+    - source test_env/bin/activate
+    - pip install dist/*.whl
+    - python -c "import lightrag; print(f'LightRAG version: {lightrag.__version__}')"
+    
+    - echo "✅ Python package built successfully"
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 hour
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+build-frontend:
+  stage: build
+  image: node:${NODE_VERSION}-alpine
+  cache:
+    paths:
+      - lightrag_webui/node_modules/
+  before_script:
+    - cd lightrag_webui
+    - npm ci
+  script:
+    - echo "🏗️ Building frontend..."
+    
+    # Install Bun if available, fallback to npm
+    - |
+      if command -v bun &> /dev/null; then
+        bun run build
+      else
+        npm run build-no-bun
+      fi
+    
+    # Lint frontend
+    - |
+      if command -v bun &> /dev/null; then
+        bun run lint
+      else
+        npm run lint || true
+      fi
+    
+    # Type check
+    - npx tsc --noEmit
+    
+    - echo "✅ Frontend built successfully"
+  artifacts:
+    paths:
+      - lightrag_webui/dist/
+    expire_in: 1 hour
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+build-docker:
+  stage: build
+  image: docker:24.0.5
+  services:
+    - docker:24.0.5-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - echo "🐳 Building Docker images..."
+    
+    # Build development image
+    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA .
+    - docker build -t $CI_REGISTRY_IMAGE:production-$CI_COMMIT_SHA -f Dockerfile.production .
+    
+    # Push images
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+    - docker push $CI_REGISTRY_IMAGE:production-$CI_COMMIT_SHA
+    
+    # Tag latest on default branch
+    - |
+      if [[ "$CI_COMMIT_BRANCH" == "$CI_DEFAULT_BRANCH" ]]; then
+        docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest
+        docker tag $CI_REGISTRY_IMAGE:production-$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:production-latest
+        docker push $CI_REGISTRY_IMAGE:latest
+        docker push $CI_REGISTRY_IMAGE:production-latest
+      fi
+    
+    - echo "✅ Docker images built and pushed"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# ==================== TEST STAGE ====================
+
+# Test matrix for different Python versions and test groups
+.test-template: &test-template
+  stage: test
+  services:
+    - name: pgvector/pgvector:pg16
+      alias: postgres
+      variables:
+        POSTGRES_USER: $POSTGRES_USER
+        POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+        POSTGRES_DB: $POSTGRES_DB
+    - name: redis:7-alpine
+      alias: redis
+  variables:
+    POSTGRES_HOST: postgres
+    POSTGRES_PORT: "5432"
+  cache:
+    paths:
+      - .cache/pip
+      - .pytest_cache/
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq postgresql-client redis-tools
+    - python -m pip install --upgrade pip
+    - pip install -e ".[test,api]"
+    
+    # Set up test environment
+    - cp env.example .env
+    - echo "POSTGRES_HOST=postgres" >> .env
+    - echo "POSTGRES_PORT=5432" >> .env
+    - echo "POSTGRES_USER=$POSTGRES_USER" >> .env
+    - echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" >> .env
+    - echo "POSTGRES_DB=$POSTGRES_DB" >> .env
+    - echo "REDIS_URL=redis://redis:6379" >> .env
+    - echo "NODE_ENV=test" >> .env
+    
+    # Wait for services
+    - |
+      until pg_isready -h postgres -p 5432 -U $POSTGRES_USER; do
+        echo "Waiting for PostgreSQL..."
+        sleep 2
+      done
+    - |
+      until redis-cli -h redis -p 6379 ping; do
+        echo "Waiting for Redis..."
+        sleep 2
+      done
+    
+    # Initialize databases
+    - PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -d $POSTGRES_DB -c "CREATE EXTENSION IF NOT EXISTS vector;"
+    - redis-cli -h redis -p 6379 flushall
+
+# Unit Tests
+test-unit-py310:
+  <<: *test-template
+  image: python:3.10-slim
+  script:
+    - python -m pytest tests/ -m "unit and not slow" -v --tb=short --cov-report=xml:coverage-unit-py310.xml --junit-xml=report-unit-py310.xml
+  artifacts:
+    when: always
+    reports:
+      junit: report-unit-py310.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage-unit-py310.xml
+    paths:
+      - coverage-unit-py310.xml
+    expire_in: 1 week
+
+test-unit-py311:
+  <<: *test-template
+  image: python:3.11-slim
+  script:
+    - python -m pytest tests/ -m "unit and not slow" -v --tb=short --cov-report=xml:coverage-unit-py311.xml --junit-xml=report-unit-py311.xml
+  artifacts:
+    when: always
+    reports:
+      junit: report-unit-py311.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage-unit-py311.xml
+    paths:
+      - coverage-unit-py311.xml
+    expire_in: 1 week
+
+# Integration Tests
+test-integration:
+  <<: *test-template
+  script:
+    - python -m pytest tests/integration/ -m "integration" -v --tb=short --cov-report=xml:coverage-integration.xml --junit-xml=report-integration.xml
+  artifacts:
+    when: always
+    reports:
+      junit: report-integration.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage-integration.xml
+    paths:
+      - coverage-integration.xml
+    expire_in: 1 week
+
+# API Tests
+test-api:
+  <<: *test-template
+  script:
+    - python -m pytest tests/ -m "api" -v --tb=short --cov-report=xml:coverage-api.xml --junit-xml=report-api.xml
+  artifacts:
+    when: always
+    reports:
+      junit: report-api.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage-api.xml
+    paths:
+      - coverage-api.xml
+    expire_in: 1 week
+
+# Storage Tests
+test-storage:
+  <<: *test-template
+  script:
+    - python -m pytest tests/ -m "storage" -v --tb=short --cov-report=xml:coverage-storage.xml --junit-xml=report-storage.xml
+  artifacts:
+    when: always
+    reports:
+      junit: report-storage.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage-storage.xml
+    paths:
+      - coverage-storage.xml
+    expire_in: 1 week
+
+# Core Functionality Tests
+test-core:
+  <<: *test-template
+  script:
+    - python -m pytest tests/ -m "core" -v --tb=short --cov-report=xml:coverage-core.xml --junit-xml=report-core.xml
+  artifacts:
+    when: always
+    reports:
+      junit: report-core.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage-core.xml
+    paths:
+      - coverage-core.xml
+    expire_in: 1 week
+
+# Production Tests
+test-production:
+  <<: *test-template
+  script:
+    - python -m pytest tests/production/ -m "production" -v --tb=short --cov-report=xml:coverage-production.xml --junit-xml=report-production.xml
+  artifacts:
+    when: always
+    reports:
+      junit: report-production.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage-production.xml
+    paths:
+      - coverage-production.xml
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# Docker Integration Tests
+test-docker:
+  stage: test
+  image: docker:24.0.5
+  services:
+    - docker:24.0.5-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  needs:
+    - build-docker
+  script:
+    - echo "🐳 Testing Docker integration..."
+    
+    # Test development compose
+    - docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+    - |
+      cat > .env << EOF
+      NODE_ENV=test
+      DEBUG=false
+      EOF
+    
+    # Create modified compose file
+    - sed "s|lightrag:latest|$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA|g" docker-compose.yml > docker-compose.test.yml
+    - docker-compose -f docker-compose.test.yml up -d --wait
+    - sleep 30
+    
+    # Health checks
+    - curl -f http://localhost:9621/health || exit 1
+    
+    # Cleanup
+    - docker-compose -f docker-compose.test.yml down
+    
+    - echo "✅ Docker integration tests passed"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# Coverage Analysis
+coverage-analysis:
+  stage: test
+  needs:
+    - test-unit-py310
+    - test-unit-py311
+    - test-integration
+    - test-api
+    - test-storage
+    - test-core
+  script:
+    - pip install coverage[toml]
+    - echo "📊 Analyzing test coverage..."
+    
+    # Combine all coverage reports
+    - coverage combine coverage-*.xml || true
+    - coverage report --show-missing
+    - coverage html
+    
+    # Check coverage threshold
+    - coverage report --fail-under=$COVERAGE_THRESHOLD
+    
+    - echo "✅ Coverage analysis completed"
+  coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
+  artifacts:
+    paths:
+      - htmlcov/
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    expire_in: 1 week
+
+# ==================== SECURITY STAGE ====================
+
+security-scan:
+  stage: security
+  image: aquasec/trivy:latest
+  script:
+    - echo "🔒 Running security scans..."
+    
+    # Filesystem scan
+    - trivy fs --format template --template "@contrib/gitlab.tpl" -o trivy-fs-report.json .
+    
+    # Config scan
+    - trivy config --format template --template "@contrib/gitlab.tpl" -o trivy-config-report.json .
+    
+    - echo "✅ Security scans completed"
+  artifacts:
+    reports:
+      dependency_scanning: trivy-fs-report.json
+      container_scanning: trivy-config-report.json
+    expire_in: 1 week
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+dependency-scan:
+  stage: security
+  script:
+    - pip install safety pip-audit
+    - echo "🔍 Scanning dependencies for vulnerabilities..."
+    
+    # Safety scan
+    - safety check --json --output safety-report.json || true
+    
+    # pip-audit scan
+    - pip-audit --format=json --output=pip-audit-report.json || true
+    
+    - echo "✅ Dependency scan completed"
+  artifacts:
+    reports:
+      dependency_scanning: safety-report.json
+    paths:
+      - safety-report.json
+      - pip-audit-report.json
+    expire_in: 1 week
+
+secrets-scan:
+  stage: security
+  image: trufflesecurity/trufflehog:latest
+  script:
+    - echo "🔐 Scanning for secrets..."
+    - trufflehog filesystem . --json > trufflehog-report.json || true
+    - echo "✅ Secrets scan completed"
+  artifacts:
+    paths:
+      - trufflehog-report.json
+    expire_in: 1 week
+  allow_failure: true
+
+# ==================== DEPLOYMENT STAGE ====================
+
+deploy-staging:
+  stage: deploy
+  image: alpine:latest
+  environment:
+    name: staging
+    url: https://staging.lightrag.example.com
+  before_script:
+    - apk add --no-cache curl bash
+  script:
+    - echo "🚀 Deploying to staging..."
+    
+    # Deploy using deployment script
+    - chmod +x scripts/deploy/deploy-docker.sh
+    - export ENVIRONMENT=staging
+    - export IMAGE_TAG=$CI_COMMIT_SHA
+    - export REGISTRY=$CI_REGISTRY
+    - export IMAGE_NAME=$CI_PROJECT_PATH
+    - scripts/deploy/deploy-docker.sh
+    
+    # Health check
+    - sleep 30
+    - curl -f $CI_ENVIRONMENT_URL/health || exit 1
+    
+    - echo "✅ Staging deployment completed"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  needs:
+    - build-docker
+    - coverage-analysis
+
+deploy-production:
+  stage: deploy
+  image: alpine:latest
+  environment:
+    name: production
+    url: https://lightrag.example.com
+  before_script:
+    - apk add --no-cache curl bash
+  script:
+    - echo "🚀 Deploying to production..."
+    
+    # Deploy using deployment script
+    - chmod +x scripts/deploy/deploy-docker.sh
+    - export ENVIRONMENT=production
+    - export IMAGE_TAG=$CI_COMMIT_SHA
+    - export REGISTRY=$CI_REGISTRY
+    - export IMAGE_NAME=$CI_PROJECT_PATH
+    - scripts/deploy/deploy-docker.sh
+    
+    # Health check
+    - sleep 60
+    - curl -f $CI_ENVIRONMENT_URL/health || exit 1
+    - curl -f $CI_ENVIRONMENT_URL/api/health || exit 1
+    
+    - echo "✅ Production deployment completed"
+  rules:
+    - if: $CI_COMMIT_TAG
+  when: manual
+  needs:
+    - build-docker
+    - coverage-analysis
+    - security-scan
+
+deploy-k8s:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  environment:
+    name: kubernetes
+  script:
+    - echo "☸️ Deploying to Kubernetes..."
+    
+    # Configure kubectl
+    - echo "$KUBECONFIG_CONTENT" | base64 -d > ~/.kube/config
+    
+    # Deploy using K8s script
+    - chmod +x scripts/deploy/deploy-k8s.sh
+    - export ENVIRONMENT=production
+    - export IMAGE_TAG=$CI_COMMIT_SHA
+    - export REGISTRY=$CI_REGISTRY
+    - export IMAGE_NAME=$CI_PROJECT_PATH
+    - export NAMESPACE=lightrag-production
+    - scripts/deploy/deploy-k8s.sh
+    
+    # Verify deployment
+    - kubectl rollout status deployment/lightrag -n lightrag-production --timeout=300s
+    
+    - echo "✅ Kubernetes deployment completed"
+  rules:
+    - if: $CI_COMMIT_TAG
+  when: manual
+  needs:
+    - build-docker
+    - coverage-analysis
+
+# ==================== NOTIFICATION STAGE ====================
+
+notify-success:
+  stage: notify
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl
+  script:
+    - echo "📢 Sending success notification..."
+    - |
+      if [[ -n "$SLACK_WEBHOOK_URL" ]]; then
+        curl -X POST -H 'Content-type: application/json' \
+          --data "{\"text\":\"✅ LightRAG pipeline succeeded for $CI_COMMIT_REF_NAME ($CI_COMMIT_SHORT_SHA)\"}" \
+          $SLACK_WEBHOOK_URL
+      fi
+    - echo "✅ Notifications sent"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+  when: on_success
+
+notify-failure:
+  stage: notify
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl
+  script:
+    - echo "📢 Sending failure notification..."
+    - |
+      if [[ -n "$SLACK_WEBHOOK_URL" ]]; then
+        curl -X POST -H 'Content-type: application/json' \
+          --data "{\"text\":\"❌ LightRAG pipeline failed for $CI_COMMIT_REF_NAME ($CI_COMMIT_SHORT_SHA)\"}" \
+          $SLACK_WEBHOOK_URL
+      fi
+    - echo "✅ Failure notifications sent"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+  when: on_failure
+
+# ==================== RELEASE AUTOMATION ====================
+
+release:
+  stage: deploy
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  script:
+    - echo "🏷️ Creating GitLab release..."
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: 'LightRAG $CI_COMMIT_TAG'
+    description: |
+      Release $CI_COMMIT_TAG of LightRAG
+      
+      ## Installation
+      
+      ```bash
+      pip install lightrag-hku==${CI_COMMIT_TAG#v}
+      ```
+      
+      ## Docker
+      
+      ```bash
+      docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG
+      ```
+    assets:
+      links:
+        - name: 'Docker Image'
+          url: '$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG'
+        - name: 'Coverage Report'
+          url: '$CI_JOB_URL/artifacts/file/htmlcov/index.html'
+  rules:
+    - if: $CI_COMMIT_TAG
+
+# ==================== MANUAL JOBS ====================
+
+performance-test:
+  stage: test
+  script:
+    - pip install locust pytest-benchmark
+    - echo "⚡ Running performance tests..."
+    - python -m pytest tests/production/test_performance.py --benchmark-only -v
+  rules:
+    - when: manual
+  allow_failure: true
+
+cleanup-registry:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    - echo "🧹 Cleaning up old container images..."
+    # Script to clean up old images in GitLab Container Registry
+    # This would use GitLab API to remove old images
+  rules:
+    - when: manual
+  allow_failure: true

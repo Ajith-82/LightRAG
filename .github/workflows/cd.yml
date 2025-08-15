@@ -1,0 +1,400 @@
+name: CD - Continuous Deployment
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+      force_deploy:
+        description: 'Force deployment (skip some checks)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  PYTHON_VERSION: '3.10'
+  NODE_VERSION: '18'
+
+jobs:
+  pre-deployment-checks:
+    name: Pre-deployment Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    outputs:
+      deploy_staging: ${{ steps.conditions.outputs.deploy_staging }}
+      deploy_production: ${{ steps.conditions.outputs.deploy_production }}
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Determine deployment conditions
+      id: conditions
+      run: |
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          if [[ "${{ github.event.inputs.environment }}" == "staging" ]]; then
+            echo "deploy_staging=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event.inputs.environment }}" == "production" ]]; then
+            echo "deploy_production=true" >> $GITHUB_OUTPUT
+          fi
+        elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          echo "deploy_staging=true" >> $GITHUB_OUTPUT
+        elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+          echo "deploy_production=true" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Get version
+      id: version
+      run: |
+        if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+          VERSION=${GITHUB_REF#refs/tags/}
+        else
+          VERSION=$(git describe --tags --always --dirty)
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+
+    - name: Check if CI passed
+      if: ${{ !inputs.force_deploy }}
+      run: |
+        # Get the latest CI run for this commit
+        CI_STATUS=$(gh api \
+          repos/${{ github.repository }}/actions/workflows/ci.yml/runs \
+          --jq ".workflow_runs[0] | select(.head_sha == \"${{ github.sha }}\") | .conclusion" \
+          || echo "unknown")
+        
+        if [[ "$CI_STATUS" != "success" ]] && [[ "${{ inputs.force_deploy }}" != "true" ]]; then
+          echo "❌ CI checks have not passed for this commit. Status: $CI_STATUS"
+          echo "Use force_deploy=true to override this check."
+          exit 1
+        fi
+        echo "✅ CI checks passed"
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-and-push-images:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    needs: pre-deployment-checks
+    if: needs.pre-deployment-checks.outputs.deploy_staging == 'true' || needs.pre-deployment-checks.outputs.deploy_production == 'true'
+    timeout-minutes: 30
+
+    outputs:
+      image_digest: ${{ steps.push.outputs.digest }}
+      image_tags: ${{ steps.meta.outputs.tags }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
+      id: push
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: Dockerfile.production
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        build-args: |
+          VERSION=${{ needs.pre-deployment-checks.outputs.version }}
+          BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+          GIT_COMMIT=${{ github.sha }}
+
+    - name: Generate SBOM
+      uses: anchore/sbom-action@v0
+      with:
+        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        format: spdx-json
+        output-file: sbom.spdx.json
+
+    - name: Upload SBOM
+      uses: actions/upload-artifact@v3
+      with:
+        name: sbom
+        path: sbom.spdx.json
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [pre-deployment-checks, build-and-push-images]
+    if: needs.pre-deployment-checks.outputs.deploy_staging == 'true'
+    environment: staging
+    timeout-minutes: 20
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Deploy to staging
+      run: |
+        echo "🚀 Deploying to staging environment..."
+        
+        # Use deployment script
+        chmod +x scripts/deploy/deploy-docker.sh
+        export ENVIRONMENT=staging
+        export IMAGE_TAG=${{ github.sha }}
+        export REGISTRY=${{ env.REGISTRY }}
+        export IMAGE_NAME=${{ env.IMAGE_NAME }}
+        
+        scripts/deploy/deploy-docker.sh
+
+    - name: Run staging health checks
+      run: |
+        echo "🔍 Running staging health checks..."
+        chmod +x scripts/deploy/health-check.sh
+        export ENVIRONMENT=staging
+        scripts/deploy/health-check.sh
+
+    - name: Run smoke tests
+      run: |
+        echo "🧪 Running smoke tests..."
+        python -m pytest tests/integration/test_api_endpoints.py::test_health_endpoint -v
+        python -m pytest tests/integration/test_api_endpoints.py::test_basic_query -v
+      env:
+        API_URL: ${{ secrets.STAGING_API_URL }}
+        API_KEY: ${{ secrets.STAGING_API_KEY }}
+
+    - name: Staging deployment success
+      run: |
+        echo "✅ Staging deployment completed successfully!"
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [pre-deployment-checks, build-and-push-images]
+    if: needs.pre-deployment-checks.outputs.deploy_production == 'true'
+    environment: production
+    timeout-minutes: 30
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Production deployment approval
+      run: |
+        echo "🔐 Production deployment requires manual approval"
+        echo "Version: ${{ needs.pre-deployment-checks.outputs.version }}"
+        echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+
+    - name: Deploy to production
+      run: |
+        echo "🚀 Deploying to production environment..."
+        
+        # Use deployment script with production settings
+        chmod +x scripts/deploy/deploy-docker.sh
+        export ENVIRONMENT=production
+        export IMAGE_TAG=${{ github.sha }}
+        export REGISTRY=${{ env.REGISTRY }}
+        export IMAGE_NAME=${{ env.IMAGE_NAME }}
+        
+        scripts/deploy/deploy-docker.sh
+
+    - name: Run production health checks
+      run: |
+        echo "🔍 Running production health checks..."
+        chmod +x scripts/deploy/health-check.sh
+        export ENVIRONMENT=production
+        scripts/deploy/health-check.sh
+
+    - name: Run full integration tests
+      run: |
+        echo "🧪 Running full integration tests..."
+        python -m pytest tests/integration/ -v --tb=short
+      env:
+        API_URL: ${{ secrets.PRODUCTION_API_URL }}
+        API_KEY: ${{ secrets.PRODUCTION_API_KEY }}
+
+    - name: Update production documentation
+      run: |
+        echo "📚 Updating production documentation..."
+        echo "Deployment completed at: $(date -u)" > LAST_DEPLOYMENT.md
+        echo "Version: ${{ needs.pre-deployment-checks.outputs.version }}" >> LAST_DEPLOYMENT.md
+        echo "Commit: ${{ github.sha }}" >> LAST_DEPLOYMENT.md
+        echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" >> LAST_DEPLOYMENT.md
+
+    - name: Production deployment success
+      run: |
+        echo "✅ Production deployment completed successfully!"
+
+  deploy-kubernetes:
+    name: Deploy to Kubernetes
+    runs-on: ubuntu-latest
+    needs: [pre-deployment-checks, build-and-push-images]
+    if: needs.pre-deployment-checks.outputs.deploy_production == 'true'
+    environment: kubernetes-production
+    timeout-minutes: 25
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure kubectl
+      run: |
+        echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+        kubectl version --client
+
+    - name: Deploy to Kubernetes
+      run: |
+        echo "🚀 Deploying to Kubernetes..."
+        
+        # Use Kubernetes deployment script
+        chmod +x scripts/deploy/deploy-k8s.sh
+        export ENVIRONMENT=production
+        export IMAGE_TAG=${{ github.sha }}
+        export REGISTRY=${{ env.REGISTRY }}
+        export IMAGE_NAME=${{ env.IMAGE_NAME }}
+        export NAMESPACE=lightrag-production
+        
+        scripts/deploy/deploy-k8s.sh
+
+    - name: Verify Kubernetes deployment
+      run: |
+        echo "🔍 Verifying Kubernetes deployment..."
+        kubectl rollout status deployment/lightrag -n lightrag-production --timeout=300s
+        kubectl get pods -n lightrag-production
+        kubectl get services -n lightrag-production
+
+    - name: Run Kubernetes health checks
+      run: |
+        echo "🔍 Running Kubernetes health checks..."
+        # Get service URL
+        SERVICE_URL=$(kubectl get service lightrag -n lightrag-production -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+        if [[ -z "$SERVICE_URL" ]]; then
+          SERVICE_URL=$(kubectl get service lightrag -n lightrag-production -o jsonpath='{.spec.clusterIP}')
+        fi
+        
+        # Health checks
+        curl -f "http://$SERVICE_URL:9621/health" || exit 1
+        curl -f "http://$SERVICE_URL:9621/api/health" || exit 1
+
+  post-deployment:
+    name: Post-deployment Tasks
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production, deploy-kubernetes]
+    if: always() && (needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success')
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Send deployment notification
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const deploymentResults = {
+            staging: '${{ needs.deploy-staging.result }}',
+            production: '${{ needs.deploy-production.result }}',
+            kubernetes: '${{ needs.deploy-kubernetes.result }}'
+          };
+          
+          let message = '🚀 **Deployment Status Update**\n\n';
+          
+          if (deploymentResults.staging === 'success') {
+            message += '✅ Staging deployment: **SUCCESS**\n';
+          } else if (deploymentResults.staging === 'failure') {
+            message += '❌ Staging deployment: **FAILED**\n';
+          }
+          
+          if (deploymentResults.production === 'success') {
+            message += '✅ Production deployment: **SUCCESS**\n';
+          } else if (deploymentResults.production === 'failure') {
+            message += '❌ Production deployment: **FAILED**\n';
+          }
+          
+          if (deploymentResults.kubernetes === 'success') {
+            message += '✅ Kubernetes deployment: **SUCCESS**\n';
+          } else if (deploymentResults.kubernetes === 'failure') {
+            message += '❌ Kubernetes deployment: **FAILED**\n';
+          }
+          
+          message += '\n📊 **Deployment Details:**\n';
+          message += `- Version: ${{ needs.pre-deployment-checks.outputs.version }}\n`;
+          message += `- Commit: ${context.sha.substring(0, 7)}\n`;
+          message += `- Triggered by: ${context.actor}\n`;
+          
+          // Create deployment issue or comment
+          if (context.eventName === 'push') {
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body: message
+            });
+          }
+
+    - name: Update deployment status
+      run: |
+        echo "📊 Deployment Summary:"
+        echo "- Staging: ${{ needs.deploy-staging.result }}"
+        echo "- Production: ${{ needs.deploy-production.result }}"
+        echo "- Kubernetes: ${{ needs.deploy-kubernetes.result }}"
+        echo "- Version: ${{ needs.pre-deployment-checks.outputs.version }}"
+
+  rollback:
+    name: Rollback (Manual Trigger)
+    runs-on: ubuntu-latest
+    if: failure() && github.event_name == 'workflow_dispatch'
+    needs: [deploy-staging, deploy-production, deploy-kubernetes]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Rollback deployment
+      run: |
+        echo "🔄 Initiating rollback procedures..."
+        
+        # Use rollback script
+        chmod +x scripts/deploy/rollback.sh
+        export ENVIRONMENT=${{ github.event.inputs.environment }}
+        scripts/deploy/rollback.sh
+
+    - name: Verify rollback
+      run: |
+        echo "🔍 Verifying rollback..."
+        chmod +x scripts/deploy/health-check.sh
+        export ENVIRONMENT=${{ github.event.inputs.environment }}
+        scripts/deploy/health-check.sh

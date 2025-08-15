@@ -20,6 +20,7 @@ from typing import (
     Optional,
     List,
     Dict,
+    Union,
 )
 from lightrag.constants import (
     DEFAULT_MAX_GLEANING,
@@ -138,8 +139,8 @@ class LightRAG:
 
     # Logging (Deprecated, use setup_logger in utils.py instead)
     # ---
-    log_level: int | None = field(default=None)
-    log_file_path: str | None = field(default=None)
+    log_level: Optional[int] = field(default=None)
+    log_file_path: Optional[str] = field(default=None)
 
     # Query parameters
     # ---
@@ -245,7 +246,7 @@ class LightRAG:
     # Embedding
     # ---
 
-    embedding_func: EmbeddingFunc | None = field(default=None)
+    embedding_func: Optional[EmbeddingFunc] = field(default=None)
     """Function for computing text embeddings. Must be set before use."""
 
     embedding_batch_num: int = field(default=int(os.getenv("EMBEDDING_BATCH_NUM", 10)))
@@ -272,7 +273,7 @@ class LightRAG:
     # LLM Configuration
     # ---
 
-    llm_model_func: Callable[..., object] | None = field(default=None)
+    llm_model_func: Optional[Callable[..., object]] = field(default=None)
     """Function for interacting with the large language model (LLM). Must be set before use."""
 
     llm_model_name: str = field(default="gpt-4o-mini")
@@ -292,7 +293,7 @@ class LightRAG:
     # Rerank Configuration
     # ---
 
-    rerank_model_func: Callable[..., object] | None = field(default=None)
+    rerank_model_func: Optional[Callable[..., object]] = field(default=None)
     """Function for reranking retrieved documents. All rerank configurations (model name, API keys, top_k, etc.) should be included in this function. Optional."""
 
     min_rerank_score: float = field(
@@ -655,7 +656,7 @@ class LightRAG:
 
     def insert(
         self,
-        input: str | list[str],
+        input: Union[str, list[str]],
         split_by_character: str | None = None,
         split_by_character_only: bool = False,
         ids: str | list[str] | None = None,
@@ -691,7 +692,7 @@ class LightRAG:
 
     async def ainsert(
         self,
-        input: str | list[str],
+        input: Union[str, list[str]],
         split_by_character: str | None = None,
         split_by_character_only: bool = False,
         ids: str | list[str] | None = None,

@@ -1,7 +1,7 @@
 import os
 import time
 import asyncio
-from typing import Any, final
+from typing import Any, final, Optional
 import json
 import numpy as np
 from dataclasses import dataclass
@@ -200,7 +200,7 @@ class FaissVectorDBStorage(BaseVectorStorage):
         return [m["__id__"] for m in list_data]
 
     async def query(
-        self, query: str, top_k: int, ids: list[str] | None = None
+        self, query: str, top_k: int, ids: Optional[list[str]] = None
     ) -> list[dict[str, Any]]:
         """
         Search by a textual query; returns top_k results with their metadata + similarity distance.
@@ -411,7 +411,7 @@ class FaissVectorDBStorage(BaseVectorStorage):
 
         return True  # Return success
 
-    async def get_by_id(self, id: str) -> dict[str, Any] | None:
+    async def get_by_id(self, id: str) -> Optional[dict[str, Any]]:
         """Get vector data by its ID
 
         Args:

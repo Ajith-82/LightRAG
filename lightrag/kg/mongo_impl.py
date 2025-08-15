@@ -5,7 +5,7 @@ import numpy as np
 import configparser
 import asyncio
 
-from typing import Any, Union, final
+from typing import Any, Union, Optional, final
 
 from ..base import (
     BaseGraphStorage,
@@ -127,7 +127,7 @@ class MongoKVStorage(BaseKVStorage):
             self.db = None
             self._data = None
 
-    async def get_by_id(self, id: str) -> dict[str, Any] | None:
+    async def get_by_id(self, id: str) -> Optional[dict[str, Any]]:
         # Unified handling for flattened keys
         doc = await self._data.find_one({"_id": id})
         if doc:
@@ -232,7 +232,7 @@ class MongoKVStorage(BaseKVStorage):
         except PyMongoError as e:
             logger.error(f"Error deleting documents from {self.namespace}: {e}")
 
-    async def drop_cache_by_modes(self, modes: list[str] | None = None) -> bool:
+    async def drop_cache_by_modes(self, modes: Optional[list[str]] = None) -> bool:
         """Delete specific records from storage by cache mode
 
         Args:
@@ -645,7 +645,7 @@ class MongoGraphStorage(BaseGraphStorage):
     # -------------------------------------------------------------------------
     #
 
-    async def get_node(self, node_id: str) -> dict[str, str] | None:
+    async def get_node(self, node_id: str) -> Optional[dict[str, str]]:
         """
         Return the full node document, or None if missing.
         """
@@ -669,7 +669,7 @@ class MongoGraphStorage(BaseGraphStorage):
             }
         )
 
-    async def get_node_edges(self, source_node_id: str) -> list[tuple[str, str]] | None:
+    async def get_node_edges(self, source_node_id: str) -> Optional[list[tuple[str, str]]]:
         """
         Retrieves all edges (relationships) for a particular node identified by its label.
 
@@ -1387,8 +1387,8 @@ class MongoGraphStorage(BaseGraphStorage):
 @final
 @dataclass
 class MongoVectorDBStorage(BaseVectorStorage):
-    db: AsyncDatabase | None = field(default=None)
-    _data: AsyncCollection | None = field(default=None)
+    db: Optional[AsyncDatabase] = field(default=None)
+    _data: Optional[AsyncCollection] = field(default=None)
     _index_name: str = field(default="", init=False)
 
     def __init__(
@@ -1534,7 +1534,7 @@ class MongoVectorDBStorage(BaseVectorStorage):
         return list_data
 
     async def query(
-        self, query: str, top_k: int, ids: list[str] | None = None
+        self, query: str, top_k: int, ids: Optional[list[str]] = None
     ) -> list[dict[str, Any]]:
         """Queries the vector database using Atlas Vector Search."""
         # Generate the embedding
@@ -1657,7 +1657,7 @@ class MongoVectorDBStorage(BaseVectorStorage):
             logger.error(f"Error searching by prefix in {self.namespace}: {str(e)}")
             return []
 
-    async def get_by_id(self, id: str) -> dict[str, Any] | None:
+    async def get_by_id(self, id: str) -> Optional[dict[str, Any]]:
         """Get vector data by its ID
 
         Args:

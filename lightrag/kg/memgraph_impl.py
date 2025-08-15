@@ -2,7 +2,7 @@ import os
 import asyncio
 import random
 from dataclasses import dataclass
-from typing import final
+from typing import final, Optional
 import configparser
 
 from ..utils import logger
@@ -182,7 +182,7 @@ class MemgraphStorage(BaseGraphStorage):
                 await result.consume()  # Ensure the result is consumed even on error
                 raise
 
-    async def get_node(self, node_id: str) -> dict[str, str] | None:
+    async def get_node(self, node_id: str) -> Optional[dict[str, str]]:
         """Get node by its label identifier, return only node properties
 
         Args:
@@ -314,7 +314,7 @@ class MemgraphStorage(BaseGraphStorage):
                 await result.consume()  # Ensure the result is consumed even on error
                 raise
 
-    async def get_node_edges(self, source_node_id: str) -> list[tuple[str, str]] | None:
+    async def get_node_edges(self, source_node_id: str) -> Optional[list[tuple[str, str]]]:
         """Retrieves all edges (relationships) for a particular node identified by its label.
 
         Args:
