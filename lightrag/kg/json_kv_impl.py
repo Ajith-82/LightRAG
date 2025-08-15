@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass
-from typing import Any, final, Union, Optional
+from typing import Any, final, Optional
 
 from lightrag.base import (
     BaseKVStorage,

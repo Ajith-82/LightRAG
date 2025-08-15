@@ -1,6 +1,6 @@
 import asyncio
 import os
-from typing import Any, final, Optional, Union
+from typing import Any, final, Optional
 from dataclasses import dataclass
 import numpy as np
 import time

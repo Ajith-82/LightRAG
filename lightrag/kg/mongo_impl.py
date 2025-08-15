@@ -669,7 +669,9 @@ class MongoGraphStorage(BaseGraphStorage):
             }
         )
 
-    async def get_node_edges(self, source_node_id: str) -> Optional[list[tuple[str, str]]]:
+    async def get_node_edges(
+        self, source_node_id: str
+    ) -> Optional[list[tuple[str, str]]]:
         """
         Retrieves all edges (relationships) for a particular node identified by its label.
 

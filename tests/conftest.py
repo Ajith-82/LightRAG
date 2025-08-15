@@ -47,9 +47,9 @@ def mock_env_vars():
         "LIGHTRAG_API_KEY": "test_api_key",
         "NODE_ENV": "test",
         "DEBUG": "true",
-        "LOG_LEVEL": "DEBUG"
+        "LOG_LEVEL": "DEBUG",
     }
-    
+
     with patch.dict(os.environ, env_vars):
         yield env_vars
 
@@ -63,8 +63,8 @@ def sample_document():
         "metadata": {
             "title": "AI Test Document",
             "author": "Test Author",
-            "created_at": "2025-01-15T10:00:00Z"
-        }
+            "created_at": "2025-01-15T10:00:00Z",
+        },
     }
 
 
@@ -76,20 +76,20 @@ def sample_entities():
             "id": "ai",
             "name": "Artificial Intelligence",
             "type": "concept",
-            "description": "The simulation of human intelligence in machines"
+            "description": "The simulation of human intelligence in machines",
         },
         {
             "id": "ml",
             "name": "Machine Learning",
-            "type": "concept", 
-            "description": "A subset of AI that enables systems to learn automatically"
+            "type": "concept",
+            "description": "A subset of AI that enables systems to learn automatically",
         },
         {
             "id": "dl",
             "name": "Deep Learning",
             "type": "technique",
-            "description": "ML technique based on artificial neural networks"
-        }
+            "description": "ML technique based on artificial neural networks",
+        },
     ]
 
 
@@ -97,24 +97,9 @@ def sample_entities():
 def sample_relationships():
     """Sample relationships for graph testing."""
     return [
-        {
-            "source": "ai",
-            "target": "ml",
-            "type": "includes",
-            "weight": 0.9
-        },
-        {
-            "source": "ml",
-            "target": "dl",
-            "type": "includes",
-            "weight": 0.8
-        },
-        {
-            "source": "ai",
-            "target": "dl",
-            "type": "uses",
-            "weight": 0.7
-        }
+        {"source": "ai", "target": "ml", "type": "includes", "weight": 0.9},
+        {"source": "ml", "target": "dl", "type": "includes", "weight": 0.8},
+        {"source": "ai", "target": "dl", "type": "uses", "weight": 0.7},
     ]
 
 
@@ -122,6 +107,7 @@ def sample_relationships():
 def sample_embedding():
     """Sample embedding vector for testing."""
     import numpy as np
+
     return np.random.rand(768).tolist()
 
 
@@ -131,11 +117,7 @@ def mock_llm_response():
     return {
         "content": "This is a mock response from the language model.",
         "model": "test_model",
-        "usage": {
-            "prompt_tokens": 10,
-            "completion_tokens": 15,
-            "total_tokens": 25
-        }
+        "usage": {"prompt_tokens": 10, "completion_tokens": 15, "total_tokens": 25},
     }
 
 
@@ -143,32 +125,25 @@ def mock_llm_response():
 def mock_embedding_response():
     """Mock embedding response for testing."""
     import numpy as np
+
     return {
-        "data": [
-            {
-                "embedding": np.random.rand(768).tolist(),
-                "index": 0
-            }
-        ],
+        "data": [{"embedding": np.random.rand(768).tolist(), "index": 0}],
         "model": "test_embedding_model",
-        "usage": {
-            "prompt_tokens": 5,
-            "total_tokens": 5
-        }
+        "usage": {"prompt_tokens": 5, "total_tokens": 5},
     }
 
 
 class MockLLMProvider:
     """Mock LLM provider for testing."""
-    
+
     def __init__(self, model_name="test_model"):
         self.model_name = model_name
         self.call_count = 0
-    
+
     async def agenerate(self, prompt: str, **kwargs) -> str:
         self.call_count += 1
         return f"Mock response to: {prompt[:50]}..."
-    
+
     async def agenerate_stream(self, prompt: str, **kwargs):
         self.call_count += 1
         chunks = ["Mock ", "stream ", "response ", "to: ", prompt[:20], "..."]
@@ -178,14 +153,15 @@ class MockLLMProvider:
 
 class MockEmbeddingProvider:
     """Mock embedding provider for testing."""
-    
+
     def __init__(self, model_name="test_embedding_model", dimension=768):
         self.model_name = model_name
         self.dimension = dimension
         self.call_count = 0
-    
+
     async def agenerate(self, texts: List[str]) -> List[List[float]]:
         import numpy as np
+
         self.call_count += 1
         return [np.random.rand(self.dimension).tolist() for _ in texts]
 
@@ -210,7 +186,7 @@ def mock_storage_config(temp_working_dir):
         "namespace": "test",
         "enable_llm_cache": True,
         "max_async": 4,
-        "timeout": 60
+        "timeout": 60,
     }
 
 
@@ -229,45 +205,44 @@ def mock_api_config():
         "rate_limit_enabled": True,
         "jwt_secret_key": "test_jwt_secret",
         "jwt_expire_hours": 24,
-        "jwt_algorithm": "HS256"
+        "jwt_algorithm": "HS256",
     }
 
 
 @pytest.fixture
-def mock_lightrag_instance(mock_storage_config, mock_llm_provider, mock_embedding_provider):
+def mock_lightrag_instance(
+    mock_storage_config, mock_llm_provider, mock_embedding_provider
+):
     """Mock LightRAG instance for testing."""
-    with patch('lightrag.LightRAG') as MockLightRAG:
+    with patch("lightrag.LightRAG") as MockLightRAG:
         mock_instance = MockLightRAG.return_value
-        
+
         # Mock async methods
         mock_instance.initialize_storages = AsyncMock()
         mock_instance.finalize_storages = AsyncMock()
         mock_instance.ainsert = AsyncMock()
         mock_instance.aquery = AsyncMock(return_value="Mock query response")
         mock_instance.adelete = AsyncMock()
-        
+
         # Mock storage backends
         mock_instance.chunk_entity_relation_graph = Mock()
         mock_instance.entities_vdb = Mock()
         mock_instance.relationships_vdb = Mock()
         mock_instance.chunks_vdb = Mock()
         mock_instance.llm_response_cache = Mock()
-        
+
         # Mock configuration
         mock_instance.working_dir = mock_storage_config["working_dir"]
         mock_instance.llm_model_func = mock_llm_provider.agenerate
         mock_instance.embedding_func = mock_embedding_provider.agenerate
-        
+
         yield mock_instance
 
 
 @pytest.fixture
 def authenticated_client_headers():
     """Headers for authenticated API client."""
-    return {
-        "Authorization": "Bearer test_api_key",
-        "Content-Type": "application/json"
-    }
+    return {"Authorization": "Bearer test_api_key", "Content-Type": "application/json"}
 
 
 @pytest.fixture(autouse=True)
@@ -284,14 +259,15 @@ def setup_test_environment():
     # Set test environment variables
     os.environ["TESTING"] = "true"
     os.environ["NODE_ENV"] = "test"
-    
+
     # Suppress warnings for cleaner test output
     import warnings
+
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     warnings.filterwarnings("ignore", category=PendingDeprecationWarning)
-    
+
     yield
-    
+
     # Cleanup after all tests
     if "TESTING" in os.environ:
         del os.environ["TESTING"]
@@ -322,7 +298,7 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.storage)
         if "integration" in str(item.fspath):
             item.add_marker(pytest.mark.integration)
-        
+
         # Add markers based on test names
         if "slow" in item.name:
             item.add_marker(pytest.mark.slow)
@@ -336,7 +312,7 @@ def pytest_collection_modifyitems(config, items):
 @pytest.fixture
 def mock_database_connection():
     """Mock database connection for storage tests."""
-    with patch('psycopg2.connect') as mock_connect:
+    with patch("psycopg2.connect") as mock_connect:
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -347,7 +323,7 @@ def mock_database_connection():
 @pytest.fixture
 def mock_redis_connection():
     """Mock Redis connection for cache tests."""
-    with patch('redis.Redis') as mock_redis:
+    with patch("redis.Redis") as mock_redis:
         mock_instance = Mock()
         mock_redis.return_value = mock_instance
         yield mock_instance
@@ -356,7 +332,7 @@ def mock_redis_connection():
 @pytest.fixture
 def mock_vector_db():
     """Mock vector database for vector storage tests."""
-    with patch('lightrag.kg.vector_storage.NanoVectorDBStorage') as mock_vdb:
+    with patch("lightrag.kg.vector_storage.NanoVectorDBStorage") as mock_vdb:
         mock_instance = Mock()
         mock_instance.upsert = AsyncMock()
         mock_instance.query = AsyncMock(return_value=[])
@@ -369,24 +345,24 @@ def mock_vector_db():
 def performance_timer():
     """Timer fixture for performance testing."""
     import time
-    
+
     class Timer:
         def __init__(self):
             self.start_time = None
             self.end_time = None
-        
+
         def start(self):
             self.start_time = time.time()
-        
+
         def stop(self):
             self.end_time = time.time()
-        
+
         @property
         def elapsed(self):
             if self.start_time and self.end_time:
                 return self.end_time - self.start_time
             return None
-    
+
     return Timer()
 
 
@@ -412,6 +388,6 @@ def assert_valid_relationship(relationship: Dict[str, Any]):
 
 def create_test_file(content: str, suffix: str = ".txt") -> str:
     """Create a temporary test file with given content."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix=suffix, delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as f:
         f.write(content)
         return f.name

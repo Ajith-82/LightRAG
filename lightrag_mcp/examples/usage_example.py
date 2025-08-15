@@ -104,7 +104,7 @@ async def demonstrate_document_workflow():
         for i, doc in enumerate(documents[:5]):
             title = doc.get("title", "Untitled")
             status = doc.get("status", "unknown")
-            print(f"   {i+1}. {title} ({status})")
+            print(f"   {i + 1}. {title} ({status})")
     except Exception as e:
         print(f"   ❌ Failed to list documents: {e}")
 
@@ -164,7 +164,7 @@ async def demonstrate_graph_exploration():
             entity = entity_match.get("entity", {})
             score = entity_match.get("relevance_score", 0)
             name = entity.get("name", "Unknown")
-            print(f"   {i+1}. {name} (score: {score:.3f})")
+            print(f"   {i + 1}. {name} (score: {score:.3f})")
 
     except Exception as e:
         print(f"   ❌ Entity search failed: {e}")
@@ -189,7 +189,7 @@ async def demonstrate_graph_exploration():
             for i, node in enumerate(nodes[:3]):
                 name = node.get("properties", {}).get("name", "Unknown")
                 labels = node.get("labels", [])
-                print(f"   {i+1}. {name} (labels: {labels})")
+                print(f"   {i + 1}. {name} (labels: {labels})")
 
     except Exception as e:
         print(f"   ❌ Graph extraction failed: {e}")

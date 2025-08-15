@@ -11,7 +11,6 @@ from typing import (
     TypedDict,
     TypeVar,
     Callable,
-    Union,
     Optional,
 )
 from .utils import EmbeddingFunc
@@ -386,7 +385,9 @@ class BaseGraphStorage(StorageNameSpace, ABC):
         """
 
     @abstractmethod
-    async def get_node_edges(self, source_node_id: str) -> Optional[list[tuple[str, str]]]:
+    async def get_node_edges(
+        self, source_node_id: str
+    ) -> Optional[list[tuple[str, str]]]:
         """Get all edges connected to a node.
 
         Args:

@@ -8,15 +8,16 @@ capabilities for authentication and system operations.
 import asyncio
 import json
 import logging
+import os
+import tempfile
+import threading
 import uuid
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, Optional, List
+from collections import defaultdict, deque
 from dataclasses import dataclass, asdict
+from datetime import datetime, timezone, timedelta
 from enum import Enum
 from pathlib import Path
-import os
-import threading
-from collections import defaultdict, deque
+from typing import Dict, Any, Optional, List
 
 logger = logging.getLogger("lightrag.audit")
 
@@ -187,9 +188,6 @@ class AuditLogFormatter(logging.Formatter):
         else:
             # Standard log message
             return super().format(record)
-
-
-import tempfile
 
 
 @dataclass

@@ -837,12 +837,41 @@ async def pipeline_enqueue_file(
 
         # Process based on file type
         text_extensions = {
-            ".txt", ".md", ".html", ".htm", ".tex", ".json", ".xml", ".yaml", ".yml",
-            ".rtf", ".odt", ".epub", ".csv", ".log", ".conf", ".ini", ".properties",
-            ".sql", ".bat", ".sh", ".c", ".cpp", ".py", ".java", ".js", ".ts",
-            ".swift", ".go", ".rb", ".php", ".css", ".scss", ".less"
+            ".txt",
+            ".md",
+            ".html",
+            ".htm",
+            ".tex",
+            ".json",
+            ".xml",
+            ".yaml",
+            ".yml",
+            ".rtf",
+            ".odt",
+            ".epub",
+            ".csv",
+            ".log",
+            ".conf",
+            ".ini",
+            ".properties",
+            ".sql",
+            ".bat",
+            ".sh",
+            ".c",
+            ".cpp",
+            ".py",
+            ".java",
+            ".js",
+            ".ts",
+            ".swift",
+            ".go",
+            ".rb",
+            ".php",
+            ".css",
+            ".scss",
+            ".less",
         }
-        
+
         if ext in text_extensions:
             try:
                 # Try to decode as UTF-8
@@ -866,18 +895,18 @@ async def pipeline_enqueue_file(
                 )
                 return False
         elif ext == ".pdf":
-                if global_args.document_loading_engine == "DOCLING":
-                    content = await _process_with_enhanced_docling(file_path)
-                else:
-                    if not pm.is_installed("pypdf2"):  # type: ignore
-                        pm.install("pypdf2")
-                    from PyPDF2 import PdfReader  # type: ignore
-                    from io import BytesIO
+            if global_args.document_loading_engine == "DOCLING":
+                content = await _process_with_enhanced_docling(file_path)
+            else:
+                if not pm.is_installed("pypdf2"):  # type: ignore
+                    pm.install("pypdf2")
+                from PyPDF2 import PdfReader  # type: ignore
+                from io import BytesIO
 
-                    pdf_file = BytesIO(file)
-                    reader = PdfReader(pdf_file)
-                    for page in reader.pages:
-                        content += page.extract_text() + "\n"
+                pdf_file = BytesIO(file)
+                reader = PdfReader(pdf_file)
+                for page in reader.pages:
+                    content += page.extract_text() + "\n"
         elif ext == ".docx":
             if global_args.document_loading_engine == "DOCLING":
                 content = await _process_with_enhanced_docling(file_path)
@@ -892,9 +921,7 @@ async def pipeline_enqueue_file(
 
                 docx_file = BytesIO(file)
                 doc = Document(docx_file)
-                content = "\n".join(
-                    [paragraph.text for paragraph in doc.paragraphs]
-                )
+                content = "\n".join([paragraph.text for paragraph in doc.paragraphs])
         elif ext == ".pptx":
             if global_args.document_loading_engine == "DOCLING":
                 content = await _process_with_enhanced_docling(file_path)
@@ -926,16 +953,13 @@ async def pipeline_enqueue_file(
                     for row in sheet.iter_rows(values_only=True):
                         content += (
                             "\t".join(
-                                str(cell) if cell is not None else ""
-                                for cell in row
+                                str(cell) if cell is not None else "" for cell in row
                             )
                             + "\n"
                         )
                     content += "\n"
         else:
-            logger.error(
-                f"Unsupported file type: {file_path.name} (extension {ext})"
-            )
+            logger.error(f"Unsupported file type: {file_path.name} (extension {ext})")
             return False
 
         # Insert into the RAG queue

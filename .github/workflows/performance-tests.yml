@@ -206,7 +206,7 @@ jobs:
         "
 
     - name: Upload performance artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: performance-baseline
         path: |
@@ -483,7 +483,7 @@ jobs:
         "
 
     - name: Upload load test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: load-test-results
         path: |
@@ -616,7 +616,7 @@ jobs:
         echo "System remained stable under stress conditions." >> stress-test-report.md
 
     - name: Upload stress test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: stress-test-results
         path: stress-test-report.md
@@ -629,7 +629,7 @@ jobs:
 
     steps:
     - name: Download all test results
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
 
     - name: Generate comprehensive performance report
       run: |
@@ -687,7 +687,7 @@ jobs:
         echo "5. Scale resources based on load testing results" >> performance-summary.md
 
     - name: Upload comprehensive report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: performance-summary
         path: performance-summary.md
