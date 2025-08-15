@@ -18,13 +18,14 @@ Note: Rerank is now controlled per query via the 'enable_rerank' parameter (defa
 
 import asyncio
 import os
+
 import numpy as np
 
 from lightrag import LightRAG, QueryParam
-from lightrag.rerank import custom_rerank, RerankModel
-from lightrag.llm.openai import openai_complete_if_cache, openai_embed
-from lightrag.utils import EmbeddingFunc, setup_logger
 from lightrag.kg.shared_storage import initialize_pipeline_status
+from lightrag.llm.openai import openai_complete_if_cache, openai_embed
+from lightrag.rerank import RerankModel, custom_rerank
+from lightrag.utils import EmbeddingFunc, setup_logger
 
 # Set up your working directory
 WORKING_DIR = "./test_rerank"
@@ -224,7 +225,7 @@ async def test_direct_rerank():
         for i, doc in enumerate(reranked_docs):
             score = doc.get("rerank_score", "N/A")
             content = doc.get("content", "")[:60]
-            print(f"  {i+1}. Score: {score:.4f} | {content}...")
+            print(f"  {i + 1}. Score: {score:.4f} | {content}...")
 
     except Exception as e:
         print(f"❌ Rerank failed: {e}")

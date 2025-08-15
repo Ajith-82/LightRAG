@@ -6,10 +6,10 @@ This script demonstrates the new Docling service integration capabilities.
 """
 
 import asyncio
+import logging
 import os
 import tempfile
 from pathlib import Path
-import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

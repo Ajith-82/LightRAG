@@ -4,32 +4,32 @@ FastAPI service for LightRAG Docling document processing.
 
 import time
 from datetime import datetime, timezone
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
 import psutil
-
-from fastapi import FastAPI, HTTPException, Depends, status
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 import structlog
-
-from .models import (
-    DocumentProcessRequest,
-    ProcessingResult,
-    BatchProcessRequest,
-    BatchProcessResult,
-    HealthStatus,
-    ServiceConfiguration,
-    ErrorResponse,
-    ProcessingStatus,
-)
-from .processors import processor
 from config.docling_config import (
-    service_settings,
-    get_supported_formats,
+    get_default_docling_config,
     get_feature_flags,
     get_service_limits,
-    get_default_docling_config,
+    get_supported_formats,
+    service_settings,
 )
+from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from .models import (
+    BatchProcessRequest,
+    BatchProcessResult,
+    DocumentProcessRequest,
+    ErrorResponse,
+    HealthStatus,
+    ProcessingResult,
+    ProcessingStatus,
+    ServiceConfiguration,
+)
+from .processors import processor
 
 # Configure structured logging
 structlog.configure(

@@ -6,24 +6,24 @@ import asyncio
 import base64
 import hashlib
 import json
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional, List
-import tempfile
+from typing import Any, Dict, List, Optional
 
 import structlog
+from config.docling_config import service_settings
 from diskcache import Cache
 
 from .models import (
     DoclingConfig,
     DocumentProcessRequest,
+    ExportFormat,
+    ProcessingMetadata,
     ProcessingResult,
     ProcessingStatus,
-    ProcessingMetadata,
-    ExportFormat,
 )
-from config.docling_config import service_settings
 
 logger = structlog.get_logger(__name__)
 
@@ -150,8 +150,8 @@ class DoclingProcessor:
         start_time = time.time()
 
         try:
-            from docling.document_converter import DocumentConverter
             from docling.datamodel.base_models import ConversionStatus
+            from docling.document_converter import DocumentConverter
 
             # Initialize converter with configuration
             converter = DocumentConverter()

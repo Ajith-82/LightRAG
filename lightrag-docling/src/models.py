@@ -2,10 +2,11 @@
 Pydantic models for the Docling service API.
 """
 
+import base64
 from enum import Enum
 from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field, validator
-import base64
 
 
 class ProcessingStatus(str, Enum):
