@@ -10,6 +10,7 @@ import os
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
 
 import pipmaster as pm
 import uvicorn
