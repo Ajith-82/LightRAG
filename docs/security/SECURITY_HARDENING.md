@@ -50,23 +50,23 @@ This document outlines the security improvements implemented in the production D
 - **Status**: Maximum security with read-only filesystem
 
 ### ✅ Grafana
-- **User**: `472:472` (grafana user)
+- **User**: `2005:2005` (grafana user, UID >2000)
 - **Security**: no-new-privileges, minimal capabilities
 - **Status**: Secured with standard grafana user
 
 ### ✅ Jaeger
-- **User**: `10001:10001` (custom non-root user)
+- **User**: `2006:2006` (jaeger user, UID >2000)
 - **Security**: no-new-privileges, no capabilities
 - **Status**: Secured with custom user
 
 ### ✅ Loki
-- **User**: `10001:10001` (custom non-root user)
+- **User**: `2007:2007` (loki user, UID >2000)
 - **Security**: no-new-privileges, no capabilities
 - **Storage**: Dedicated volume with proper permissions
 - **Status**: Secured with custom user and volume
 
 ### ✅ Backup Service
-- **User**: `1000:1000` (backup user, defined in Dockerfile)
+- **User**: `2008:2008` (backup user, UID >2000 to avoid conflicts)
 - **Security**: no-new-privileges, minimal capabilities (DAC_OVERRIDE)
 - **Status**: Custom Dockerfile with non-root user
 

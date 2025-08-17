@@ -132,8 +132,16 @@ services:
     container_name: lightrag_postgres
     image: shangor/postgres-for-rag:v1.0
     restart: unless-stopped
+    user: "2001:2001"  # Run as postgres user (non-root, UID >2000)
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE  # Required for PostgreSQL data directory
+      - CHOWN         # Required for data directory ownership
     # PostgreSQL container runs as postgres user internally
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-lightrag_prod}
@@ -145,11 +153,14 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
-      - ./postgres/config/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./postgres/config/postgresql-ssl.conf:/etc/postgresql/postgresql.conf:ro
+      - ./postgres/ssl:/var/lib/postgresql/ssl:ro
     networks:
       - lightrag-network
-    ports:
-      - "127.0.0.1:5433:5432"  # Only bind to localhost for security (changed to 5433 to avoid port conflict)
+    # SECURITY: Port exposure removed for production deployment
+    # Access database only through internal network from LightRAG application
+    # ports:
+    #   - "127.0.0.1:5433:5432"  # REMOVED: External access disabled for security
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lightrag_prod} -d ${POSTGRES_DATABASE:-lightrag_production}"]
       interval: 10s
@@ -177,7 +188,7 @@ services:
     container_name: lightrag_redis
     image: redis:7-alpine
     restart: unless-stopped
-    user: "999:999"  # Run as redis user
+    user: "2002:2002"  # Run as redis user (UID >2000)
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -245,7 +256,7 @@ services:
     container_name: lightrag_nginx
     image: nginx:alpine
     restart: unless-stopped
-    user: "101:101"  # Run as nginx user
+    user: "2003:2003"  # Run as nginx user (UID >2000)
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -297,7 +308,7 @@ services:
     container_name: lightrag_prometheus
     image: prom/prometheus:latest
     restart: unless-stopped
-    user: "65534:65534"  # Run as nobody user
+    user: "2004:2004"  # Run as prometheus user (UID >2000)
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -341,7 +352,7 @@ services:
     container_name: lightrag_grafana
     image: grafana/grafana:latest
     restart: unless-stopped
-    user: "472:472"  # Run as grafana user
+    user: "2005:2005"  # Run as grafana user (UID >2000)
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -385,7 +396,7 @@ services:
     container_name: lightrag_jaeger
     image: jaegertracing/all-in-one:latest
     restart: unless-stopped
-    user: "10001:10001"  # Run as non-root user
+    user: "2006:2006"  # Run as jaeger user (UID >2000)
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -419,7 +430,7 @@ services:
     container_name: lightrag_loki
     image: grafana/loki:latest
     restart: unless-stopped
-    user: "10001:10001"  # Run as non-root user
+    user: "2007:2007"  # Run as loki user (UID >2000)
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -450,7 +461,7 @@ services:
       context: ./backup
       dockerfile: Dockerfile
     restart: unless-stopped
-    user: "1000:1000"  # Run as non-root user
+    user: "2008:2008"  # Run as backup user (UID >2000)
     security_opt:
       - no-new-privileges:true
     cap_drop:

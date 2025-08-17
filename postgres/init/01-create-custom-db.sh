@@ -5,8 +5,14 @@ set -e
 # This script creates custom user and database if they differ from defaults
 
 CUSTOM_USER="${POSTGRES_USER:-rag}"
-CUSTOM_PASSWORD="${POSTGRES_PASSWORD:-rag}"
+CUSTOM_PASSWORD="${POSTGRES_PASSWORD}"  # Password validated by 02-password-security.sh
 CUSTOM_DATABASE="${POSTGRES_DATABASE:-rag}"
+
+# Ensure password is provided (should be validated by previous script)
+if [ -z "$CUSTOM_PASSWORD" ]; then
+    echo "❌ CRITICAL ERROR: POSTGRES_PASSWORD must be set and validated"
+    exit 1
+fi
 
 echo "PostgreSQL init: Setting up database '$CUSTOM_DATABASE' for user '$CUSTOM_USER'"
 

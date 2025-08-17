@@ -66,6 +66,16 @@ services:
     container_name: lightrag_postgres_enhanced
     image: lightrag/postgresql-lightrag:latest
     restart: unless-stopped
+    user: "2001:2001"  # Run as postgres user (non-root, UID >2000)
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE  # Required for PostgreSQL data directory
+      - CHOWN         # Required for data directory ownership
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-lightrag}
       POSTGRES_USER: ${POSTGRES_USER:-lightrag}
@@ -85,12 +95,16 @@ services:
 
       # Enable extensions
       POSTGRES_EXTENSIONS: vector,age,pg_stat_statements,pg_trgm,btree_gin
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    # SECURITY: Port exposure removed for production deployment
+    # Access database only through internal network from LightRAG application
+    # ports:
+    #   - "${POSTGRES_PORT:-5432}:5432"  # REMOVED: External access disabled for security
     volumes:
       - postgres_enhanced_data:/var/lib/postgresql/data
       - ./logs/postgresql:/var/log/postgresql
-      - ./build/init:/docker-entrypoint-initdb.d:ro
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./postgres/config/postgresql-ssl.conf:/etc/postgresql/postgresql.conf:ro
+      - ./postgres/ssl:/var/lib/postgresql/ssl:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lightrag} -d ${POSTGRES_DB:-lightrag}"]
       interval: 30s
