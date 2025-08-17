@@ -77,7 +77,6 @@ from .operate import (
     kg_query,
     merge_nodes_and_edges,
     naive_query,
-    query_with_keywords,
 )
 from .types import KnowledgeGraph
 from .utils import (
@@ -726,77 +725,6 @@ class LightRAG:
 
         return track_id
 
-    # TODO: deprecated, use insert instead
-    def insert_custom_chunks(
-        self,
-        full_text: str,
-        text_chunks: list[str],
-        doc_id: str | list[str] | None = None,
-    ) -> None:
-        loop = always_get_an_event_loop()
-        loop.run_until_complete(
-            self.ainsert_custom_chunks(full_text, text_chunks, doc_id)
-        )
-
-    # TODO: deprecated, use ainsert instead
-    async def ainsert_custom_chunks(
-        self, full_text: str, text_chunks: list[str], doc_id: str | None = None
-    ) -> None:
-        update_storage = False
-        try:
-            # Clean input texts
-            full_text = clean_text(full_text)
-            text_chunks = [clean_text(chunk) for chunk in text_chunks]
-            file_path = ""
-
-            # Process cleaned texts
-            if doc_id is None:
-                doc_key = compute_mdhash_id(full_text, prefix="doc-")
-            else:
-                doc_key = doc_id
-            new_docs = {doc_key: {"content": full_text}}
-
-            _add_doc_keys = await self.full_docs.filter_keys({doc_key})
-            new_docs = {k: v for k, v in new_docs.items() if k in _add_doc_keys}
-            if not len(new_docs):
-                logger.warning("This document is already in the storage.")
-                return
-
-            update_storage = True
-            logger.info(f"Inserting {len(new_docs)} docs")
-
-            inserting_chunks: dict[str, Any] = {}
-            for index, chunk_text in enumerate(text_chunks):
-                chunk_key = compute_mdhash_id(chunk_text, prefix="chunk-")
-                tokens = len(self.tokenizer.encode(chunk_text))
-                inserting_chunks[chunk_key] = {
-                    "content": chunk_text,
-                    "full_doc_id": doc_key,
-                    "tokens": tokens,
-                    "chunk_order_index": index,
-                    "file_path": file_path,
-                }
-
-            doc_ids = set(inserting_chunks.keys())
-            add_chunk_keys = await self.text_chunks.filter_keys(doc_ids)
-            inserting_chunks = {
-                k: v for k, v in inserting_chunks.items() if k in add_chunk_keys
-            }
-            if not len(inserting_chunks):
-                logger.warning("All chunks are already in the storage.")
-                return
-
-            tasks = [
-                self.chunks_vdb.upsert(inserting_chunks),
-                self._process_entity_relation_graph(inserting_chunks),
-                self.full_docs.upsert(new_docs),
-                self.text_chunks.upsert(inserting_chunks),
-            ]
-            await asyncio.gather(*tasks)
-
-        finally:
-            if update_storage:
-                await self._insert_done()
 
     async def apipeline_enqueue_documents(
         self,
@@ -1693,58 +1621,6 @@ class LightRAG:
         await self._query_done()
         return response
 
-    # TODO: Deprecated, use user_prompt in QueryParam instead
-    def query_with_separate_keyword_extraction(
-        self, query: str, prompt: str, param: QueryParam = QueryParam()
-    ):
-        """
-        Query with separate keyword extraction step.
-
-        This method extracts keywords from the query first, then uses them for the query.
-
-        Args:
-            query: User query
-            prompt: Additional prompt for the query
-            param: Query parameters
-
-        Returns:
-            Query response
-        """
-        loop = always_get_an_event_loop()
-        return loop.run_until_complete(
-            self.aquery_with_separate_keyword_extraction(query, prompt, param)
-        )
-
-    # TODO: Deprecated, use user_prompt in QueryParam instead
-    async def aquery_with_separate_keyword_extraction(
-        self, query: str, prompt: str, param: QueryParam = QueryParam()
-    ) -> str | AsyncIterator[str]:
-        """
-        Async version of query_with_separate_keyword_extraction.
-
-        Args:
-            query: User query
-            prompt: Additional prompt for the query
-            param: Query parameters
-
-        Returns:
-            Query response or async iterator
-        """
-        response = await query_with_keywords(
-            query=query,
-            prompt=prompt,
-            param=param,
-            knowledge_graph_inst=self.chunk_entity_relation_graph,
-            entities_vdb=self.entities_vdb,
-            relationships_vdb=self.relationships_vdb,
-            chunks_vdb=self.chunks_vdb,
-            text_chunks_db=self.text_chunks,
-            global_config=asdict(self),
-            hashing_kv=self.llm_response_cache,
-        )
-
-        await self._query_done()
-        return response
 
     async def _query_done(self):
         await self.llm_response_cache.index_done_callback()

@@ -545,7 +545,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp:noexec,nosuid,size=1G
-    user: "1000:1000"
+    user: "2008:2008"
 
   # ===================================================================
   # PostgreSQL Database

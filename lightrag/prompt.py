@@ -333,26 +333,3 @@ When handling content with timestamps:
 
 Response:"""
 
-# TODO: deprecated
-PROMPTS[
-    "similarity_check"
-] = """Please analyze the similarity between these two questions:
-
-Question 1: {original_prompt}
-Question 2: {cached_prompt}
-
-Please evaluate whether these two questions are semantically similar, and whether the answer to Question 2 can be used to answer Question 1, provide a similarity score between 0 and 1 directly.
-
-Similarity score criteria:
-0: Completely unrelated or answer cannot be reused, including but not limited to:
-   - The questions have different topics
-   - The locations mentioned in the questions are different
-   - The times mentioned in the questions are different
-   - The specific individuals mentioned in the questions are different
-   - The specific events mentioned in the questions are different
-   - The background information in the questions is different
-   - The key conditions in the questions are different
-1: Identical and answer can be directly reused
-0.5: Partially related and answer needs modification to be used
-Return only a number between 0-1, without any additional content.
-"""

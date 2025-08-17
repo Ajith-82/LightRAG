@@ -60,8 +60,6 @@ log/
 !production.env
 
 # Test and Development
-test_*.py
-*_test.py
 book.txt
 *.tmp
 temp/

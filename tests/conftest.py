@@ -285,6 +285,8 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "storage: mark test as storage test")
     config.addinivalue_line("markers", "auth: mark test as authentication test")
     config.addinivalue_line("markers", "rate_limit: mark test as rate limiting test")
+    config.addinivalue_line("markers", "batching: mark test as batching orchestrator test")
+    config.addinivalue_line("markers", "performance: mark test as performance test")
 
 
 def pytest_collection_modifyitems(config, items):
@@ -392,3 +394,113 @@ def create_test_file(content: str, suffix: str = ".txt") -> str:
     with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as f:
         f.write(content)
         return f.name
+
+
+# Batching Orchestrator Fixtures
+@pytest.fixture
+def mock_redis_batching():
+    """Mock Redis client specifically for batching tests."""
+    mock_client = AsyncMock()
+    mock_client.ping.return_value = True
+    mock_client.select.return_value = True
+    mock_client.llen.return_value = 0
+    mock_client.lpush.return_value = 1
+    mock_client.lrange.return_value = []
+    mock_client.ltrim.return_value = True
+    mock_client.delete.return_value = 1
+    mock_client.setex.return_value = True
+    mock_client.get.return_value = None
+    mock_client.scan.return_value = (0, [])
+    mock_client.pipeline.return_value = mock_client
+    mock_client.execute.return_value = [[], True]
+    mock_client.close = AsyncMock()
+    return mock_client
+
+
+@pytest.fixture
+def batching_config():
+    """Test configuration for batching orchestrator."""
+    try:
+        from lightrag.config.batch_config import BatchingConfig
+        return BatchingConfig(
+            batch_size=4,
+            max_batch_size=8,
+            batch_timeout=5000,  # 5 seconds for testing
+            processing_interval=0.01,  # 10ms for fast testing
+            cache_ttl=60,
+            max_retries=2,
+            ollama_base_url="http://localhost:11434",
+            ollama_model="bge-m3:latest",
+            redis_db=15  # Use test database
+        )
+    except ImportError:
+        pytest.skip("Batching configuration not available")
+
+
+@pytest.fixture
+def sample_texts():
+    """Sample texts for batching tests."""
+    return [
+        "Machine learning is a subset of artificial intelligence.",
+        "Deep learning networks can process complex patterns in data.",
+        "Natural language processing enables computers to understand text.",
+        "Computer vision allows machines to interpret visual information.",
+        "Reinforcement learning teaches agents through trial and error.",
+        "Neural networks are inspired by biological brain structures.",
+        "Data preprocessing is crucial for machine learning success.",
+        "Feature engineering improves model performance significantly."
+    ]
+
+
+@pytest.fixture
+def mock_embeddings():
+    """Mock embeddings for testing."""
+    import numpy as np
+    return [np.random.rand(128).astype(np.float32) for _ in range(8)]
+
+
+@pytest.fixture
+def mock_ollama_session():
+    """Mock HTTP session for Ollama API."""
+    mock_session = AsyncMock()
+    
+    # Mock successful response
+    mock_response = AsyncMock()
+    mock_response.status = 200
+    mock_response.json.return_value = {
+        "embedding": [0.1, 0.2, 0.3, 0.4] * 32  # 128-dim embedding
+    }
+    
+    mock_session.post.return_value.__aenter__.return_value = mock_response
+    mock_session.get.return_value.__aenter__.return_value = mock_response
+    mock_session.close = AsyncMock()
+    
+    return mock_session
+
+
+@pytest.fixture
+def mock_batch_orchestrator(mock_redis_batching, batching_config):
+    """Mock batching orchestrator for integration tests."""
+    try:
+        from lightrag.orchestrator import OllamaBatchingOrchestrator
+        
+        orchestrator = OllamaBatchingOrchestrator(
+            redis_client=mock_redis_batching,
+            batch_size=batching_config.batch_size,
+            timeout=batching_config.batch_timeout,
+            processing_interval=batching_config.processing_interval,
+            cache_ttl=batching_config.cache_ttl,
+            ollama_config=batching_config.to_ollama_config()
+        )
+        
+        # Mock the batch processor to avoid actual Ollama calls
+        import numpy as np
+        
+        async def mock_process_batch(texts):
+            return [np.random.rand(128).astype(np.float32) for _ in texts]
+        
+        orchestrator.batch_processor.process_batch = mock_process_batch
+        
+        return orchestrator
+    except ImportError:
+        pytest.skip("Batching orchestrator not available")
