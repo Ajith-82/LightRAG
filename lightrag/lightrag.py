@@ -427,9 +427,12 @@ class LightRAG:
         logger.debug(f"LightRAG init with param:\n  {_print_config}\n")
 
         # Init Embedding
-        self.embedding_func = priority_limit_async_func_call(
-            self.embedding_func_max_async
-        )(self.embedding_func)
+        if self.embedding_func is not None:
+            self.embedding_func = priority_limit_async_func_call(
+                self.embedding_func_max_async
+            )(self.embedding_func)
+        else:
+            logger.warning("embedding_func is None - embedding operations may fail")
 
         # Initialize all storages
         self.key_string_value_json_storage_cls: type[BaseKVStorage] = (
@@ -509,13 +512,16 @@ class LightRAG:
         # Directly use llm_response_cache, don't create a new object
         hashing_kv = self.llm_response_cache
 
-        self.llm_model_func = priority_limit_async_func_call(self.llm_model_max_async)(
-            partial(
-                self.llm_model_func,  # type: ignore
-                hashing_kv=hashing_kv,
-                **self.llm_model_kwargs,
+        if self.llm_model_func is not None:
+            self.llm_model_func = priority_limit_async_func_call(self.llm_model_max_async)(
+                partial(
+                    self.llm_model_func,  # type: ignore
+                    hashing_kv=hashing_kv,
+                    **self.llm_model_kwargs,
+                )
             )
-        )
+        else:
+            logger.warning("llm_model_func is None - LLM operations may fail")
 
         # Init Rerank
         if self.rerank_model_func:

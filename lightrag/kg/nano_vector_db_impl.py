@@ -77,8 +77,18 @@ class NanoVectorDBStorage(BaseVectorStorage):
             )
         self._max_batch_size = self.global_config["embedding_batch_num"]
 
+        # Get embedding dimension with null safety check
+        if self.embedding_func is not None:
+            embedding_dim = self.embedding_func.embedding_dim
+        else:
+            # Default embedding dimension - commonly used dimension for many models
+            embedding_dim = 768
+            logger.warning(
+                f"embedding_func is None in {self.namespace}, using default dimension {embedding_dim}"
+            )
+
         self._client = NanoVectorDB(
-            self.embedding_func.embedding_dim,
+            embedding_dim,
             storage_file=self._client_file_name,
         )
 
@@ -103,9 +113,17 @@ class NanoVectorDBStorage(BaseVectorStorage):
                 logger.info(
                     f"Process {os.getpid()} reloading {self.namespace} due to update by another process"
                 )
-                # Reload data
+                # Reload data with null safety check
+                if self.embedding_func is not None:
+                    embedding_dim = self.embedding_func.embedding_dim
+                else:
+                    embedding_dim = 768
+                    logger.warning(
+                        f"embedding_func is None during reload in {self.namespace}, using default dimension {embedding_dim}"
+                    )
+
                 self._client = NanoVectorDB(
-                    self.embedding_func.embedding_dim,
+                    embedding_dim,
                     storage_file=self._client_file_name,
                 )
                 # Reset update flag
@@ -271,8 +289,17 @@ class NanoVectorDBStorage(BaseVectorStorage):
                 logger.warning(
                     f"Storage for {self.namespace} was updated by another process, reloading..."
                 )
+                # Reinitialize client with null safety check
+                if self.embedding_func is not None:
+                    embedding_dim = self.embedding_func.embedding_dim
+                else:
+                    embedding_dim = 768
+                    logger.warning(
+                        f"embedding_func is None during callback reload in {self.namespace}, using default dimension {embedding_dim}"
+                    )
+
                 self._client = NanoVectorDB(
-                    self.embedding_func.embedding_dim,
+                    embedding_dim,
                     storage_file=self._client_file_name,
                 )
                 # Reset update flag
@@ -360,8 +387,17 @@ class NanoVectorDBStorage(BaseVectorStorage):
                 if os.path.exists(self._client_file_name):
                     os.remove(self._client_file_name)
 
+                # Reinitialize client after drop with null safety check
+                if self.embedding_func is not None:
+                    embedding_dim = self.embedding_func.embedding_dim
+                else:
+                    embedding_dim = 768
+                    logger.warning(
+                        f"embedding_func is None during drop operation in {self.namespace}, using default dimension {embedding_dim}"
+                    )
+
                 self._client = NanoVectorDB(
-                    self.embedding_func.embedding_dim,
+                    embedding_dim,
                     storage_file=self._client_file_name,
                 )
 

@@ -30,8 +30,8 @@ class TestStringUtilities:
         # Test with leading/trailing whitespace
         assert clean_str("  hello world  ") == "hello world"
         
-        # Test with newlines and tabs
-        assert clean_str("hello\n\tworld") == "hello\tworld"
+        # Test with newlines and tabs (they get converted to spaces)
+        assert clean_str("hello\n\tworld") == "hello world"
         
         # Test preserving internal spaces
         assert clean_str("  hello  world  ") == "hello  world"

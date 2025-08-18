@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import tempfile
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
@@ -225,7 +226,7 @@ class TestCaching:
         cache_file = cache_dir / f"{cache_key}.json"
         cache_file.write_text(json.dumps({
             "data": cached_data,
-            "timestamp": asyncio.get_event_loop().time(),
+            "timestamp": time.time(),
             "expires_in": 3600
         }))
         

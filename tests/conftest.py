@@ -22,6 +22,19 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+@pytest.fixture(scope="session", autouse=True)
+def initialize_global_args():
+    """Initialize global_args before any tests run."""
+    try:
+        from lightrag.api.config import get_global_args
+        get_global_args()  # This initializes global_args
+        logger.info("Global args initialized successfully for test session")
+    except Exception as e:
+        logger.warning(f"Could not initialize global_args: {e}")
+        # Continue without global_args - some tests may still work
+    yield
+
+
 @pytest.fixture(scope="session")
 def event_loop():
     """Create an instance of the default event loop for the test session."""
@@ -342,6 +355,98 @@ def mock_vector_db():
         mock_instance.get_all_vectors = AsyncMock(return_value=[])
         mock_vdb.return_value = mock_instance
         yield mock_instance
+
+
+# Universal MockStorage class for testing without external dependencies
+class MockStorage:
+    """Mock storage backend that implements all storage interface methods."""
+    
+    def __init__(self, *args, **kwargs):
+        self.namespace = kwargs.get('namespace', args[0] if args else 'test')
+        self.workspace = kwargs.get('workspace', args[1] if len(args) > 1 else 'test_workspace') 
+        self.global_config = kwargs.get('global_config', args[2] if len(args) > 2 else {})
+        self.embedding_func = kwargs.get('embedding_func')
+        self._data = {}
+        self._vectors = {}
+        self._entities = {}
+        self._relationships = []
+        
+    # Storage methods (unified for KV and Vector)
+    async def upsert(self, key, value, **kwargs):
+        if isinstance(value, list) and len(value) > 10:  # Likely a vector
+            self._vectors[key] = value
+        else:  # Regular KV data
+            self._data[key] = value
+        
+    async def get(self, key):
+        return self._data.get(key)
+        
+    async def delete(self, key):
+        self._data.pop(key, None)
+        
+    async def index_done_keys(self):
+        return list(self._data.keys())
+            
+    async def query(self, query_vector, top_k=5):
+        results = []
+        for i, (key, _) in enumerate(list(self._vectors.items())[:top_k]):
+            results.append({"id": key, "score": 0.95 - i*0.1, "metadata": {}})
+        return results
+        
+    async def get_all_vectors(self):
+        return list(self._vectors.keys())
+        
+    # Graph Storage methods
+    async def upsert_entity(self, entity_id, entity_data):
+        self._entities[entity_id] = entity_data
+        
+    async def get_entity(self, entity_id):
+        return self._entities.get(entity_id)
+        
+    async def get_all_entities(self):
+        return list(self._entities.values())
+        
+    async def upsert_relationship(self, source, target, rel_type, rel_data):
+        self._relationships.append({
+            "source": source,
+            "target": target, 
+            "type": rel_type,
+            **rel_data
+        })
+        
+    async def get_all_relationships(self):
+        return self._relationships
+        
+    async def get_entity_neighbors(self, entity_id):
+        neighbors = []
+        for rel in self._relationships:
+            if rel["source"] == entity_id:
+                neighbors.append(rel["target"])
+            elif rel["target"] == entity_id:
+                neighbors.append(rel["source"])
+        return neighbors
+
+    # Document status storage methods
+    async def get_document_status(self, doc_id):
+        return self._data.get(f"doc_status_{doc_id}")
+        
+    async def set_document_status(self, doc_id, status):
+        self._data[f"doc_status_{doc_id}"] = status
+        
+    async def get_all_document_statuses(self):
+        return {k.replace("doc_status_", ""): v for k, v in self._data.items() if k.startswith("doc_status_")}
+
+
+@pytest.fixture
+def storage():
+    """Universal storage fixture that provides MockStorage for tests."""
+    return MockStorage()
+
+
+@pytest.fixture
+def mock_storage():
+    """Alternative name for storage fixture."""
+    return MockStorage()
 
 
 @pytest.fixture

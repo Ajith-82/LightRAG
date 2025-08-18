@@ -6,6 +6,7 @@ Tests all documented API endpoints with authentication, error handling, and edge
 import asyncio
 import json
 import os
+import sys
 import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -31,16 +32,23 @@ def test_app():
     except ImportError:
         pytest.skip("LightRAG API components not available")
     
-    # Create test arguments
-    test_args = parse_args([
-        "--llm_binding", "ollama",
-        "--embedding_binding", "ollama",
-        "--llm_model", "llama3",
-        "--embedding_model", "bge-m3:latest",
-        "--input_dir", tempfile.mkdtemp(),
+    # Create test arguments by mocking sys.argv and environment variables
+    test_argv = [
+        "lightrag_server.py",  # Script name
+        "--llm-binding", "ollama",
+        "--embedding-binding", "ollama", 
+        "--input-dir", tempfile.mkdtemp(),
         "--key", "test_api_key",
-        "--no-auto_scan_at_startup"
-    ])
+        "--auto-scan-at-startup"
+    ]
+    
+    test_env = {
+        "LLM_MODEL": "llama3",
+        "EMBEDDING_MODEL": "bge-m3:latest"
+    }
+    
+    with patch('sys.argv', test_argv), patch.dict(os.environ, test_env):
+        test_args = parse_args()
     
     app = create_app(test_args)
     return app
