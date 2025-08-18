@@ -1,8 +1,6 @@
 # Enhanced Docker Compose for LightRAG with PostgreSQL 16 + pgvector + Apache AGE
 # Provides advanced vector similarity search and graph database capabilities
 
-version: '3.8'
-
 services:
   lightrag:
     container_name: lightrag_enhanced
