@@ -1,0 +1,12 @@
+{
+  "doc-d60e026836995ad8cc211c3bc3ff70b7": {
+    "status": "pending",
+    "content_summary": "LightRAG is a powerful retrieval-augmented generation system that combines \n        knowledge graphs with vector search capabilities. It supports multiple LLM \n        providers including OpenAI, xAI, and Ollama. The system can process various \n     ...",
+    "content_length": 627,
+    "created_at": "2025-08-18T08:16:37.961415+00:00",
+    "updated_at": "2025-08-18T08:16:37.961446+00:00",
+    "file_path": "unknown_source",
+    "track_id": "insert_20250818_091637_b0efa057",
+    "chunks_list": []
+  }
+}

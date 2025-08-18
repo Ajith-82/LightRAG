@@ -18,8 +18,6 @@
 # - Jaeger Tracing
 # ====================================================================
 
-version: '3.8'
-
 networks:
   lightrag-network:
     driver: bridge
